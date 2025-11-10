@@ -1,0 +1,25 @@
+POST http://localhost:3000/usuarios
+Content-Type: application/json
+
+{
+  "nome": "Diogenes Barros",
+  "email": "diogenes@example.com"
+}
+
+###
+
+GET http://localhost:3000/usuarios?search=Barros
+
+###
+
+PUT http://localhost:3000/usuarios/cf9e2f36-41b0-4599-9462-44afa70f81e4
+Content-Type: application/json
+
+{
+  "nome": "Diogenes Updated",
+  "email": "diogenes.updated@example.com"
+}
+
+###
+
+DELETE http://localhost:3000/usuarios/cf9e2f36-41b0-4599-9462-44afa70f81e4

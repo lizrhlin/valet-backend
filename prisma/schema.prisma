@@ -1,0 +1,540 @@
+// Schema Prisma para Aplicativo Liz (Valet)
+// Sistema de serviços domésticos - Conecta clientes a profissionais
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserType {
+  CLIENT       // Cliente que contrata serviços
+  PROFESSIONAL // Profissional que presta serviços
+  ADMIN        // Administrador do sistema
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum AppointmentStatus {
+  PENDING    // Aguardando confirmação do profissional
+  CONFIRMED  // Confirmado pelo profissional
+  IN_PROGRESS // Serviço em andamento
+  COMPLETED  // Serviço finalizado
+  CANCELLED  // Cancelado
+  REJECTED   // Rejeitado pelo profissional
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  PIX
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  BOOKING    // Notificações de agendamento
+  CHAT       // Notificações de mensagens
+  REVIEW     // Notificações de avaliações
+  SYSTEM     // Notificações do sistema
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+// ============================================
+// USUÁRIOS
+// ============================================
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  name      String
+  phone     String?
+  password  String
+  avatar    String?    // URL da foto de perfil
+  userType  UserType   @default(CLIENT)
+  status    UserStatus @default(PENDING_VERIFICATION)
+  
+  // Documentos para verificação
+  cpf              String?  @unique
+  rg               String?
+  verificationDocs String[] // URLs dos documentos
+
+  // Preferências
+  notificationsEnabled Boolean @default(true)
+  darkMode             Boolean @default(false)
+  language             String  @default("pt-BR")
+
+  // Tokens
+  refreshToken      String?
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  addresses       Address[]
+  professionalProfile Professional?
+  
+  // Como cliente
+  appointmentsAsClient Appointment[] @relation("ClientAppointments")
+  reviewsAsClient      Review[]      @relation("ClientReviews")
+  favorites            Favorite[]
+  sentMessages         Message[]     @relation("SentMessages")
+  
+  // Como profissional
+  appointmentsAsProfessional Appointment[] @relation("ProfessionalAppointments")
+  reviewsAsProfessional      Review[]      @relation("ProfessionalReviews")
+  
+  // Notificações e Chat
+  notifications   Notification[]
+  chatParticipants ChatParticipant[]
+
+  @@map("users")
+  @@index([email])
+  @@index([userType])
+  @@index([status])
+}
+
+// ============================================
+// PERFIL PROFISSIONAL
+// ============================================
+
+model Professional {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Informações profissionais
+  specialty        String  // Especialização principal
+  description      String  @db.Text
+  experience       String  // Ex: "5 anos", "Iniciante"
+  servicesCompleted Int    @default(0)
+  
+  // Disponibilidade
+  available   Boolean @default(true)
+  isVerified  Boolean @default(false)
+  
+  // Localização
+  location    String
+  latitude    Float?
+  longitude   Float?
+  
+  // Avaliações (calculados)
+  rating       Float @default(0)
+  reviewCount  Int   @default(0)
+  
+  // Tempo de resposta médio (em minutos)
+  avgResponseTime Int?
+  
+  // Última vez online
+  lastSeen DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  categories    ProfessionalCategory[]
+  subcategories ProfessionalSubcategory[]
+  availability  Availability[]
+
+  @@map("professionals")
+  @@index([userId])
+  @@index([available])
+  @@index([rating])
+}
+
+// ============================================
+// CATEGORIAS E SERVIÇOS
+// ============================================
+
+model Category {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  slug            String   @unique
+  icon            String
+  backgroundColor String
+  description     String?
+  isActive        Boolean  @default(true)
+  order           Int      @default(0) // Para ordenação na UI
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subcategories       Subcategory[]
+  professionalCategories ProfessionalCategory[]
+
+  @@map("categories")
+  @@index([slug])
+  @@index([isActive])
+}
+
+model Subcategory {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  name        String
+  slug        String   @unique
+  description String?  @db.Text
+  
+  // Preços sugeridos (podem variar por profissional)
+  suggestedMinPrice Float?
+  suggestedMaxPrice Float?
+  
+  // Tempo estimado em minutos
+  estimatedDuration Int?
+  
+  // Imagem do serviço
+  imageUrl    String?
+  
+  isActive    Boolean @default(true)
+  order       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  professionalSubcategories ProfessionalSubcategory[]
+  appointments             Appointment[]
+
+  @@map("subcategories")
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isActive])
+}
+
+// Relacionamento N:N entre Profissional e Categoria
+model ProfessionalCategory {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  categoryId     Int
+  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([professionalId, categoryId])
+  @@map("professional_categories")
+  @@index([professionalId])
+  @@index([categoryId])
+}
+
+// Relacionamento N:N entre Profissional e Subcategoria (com preço)
+model ProfessionalSubcategory {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  subcategoryId  Int
+  subcategory    Subcategory  @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+  
+  // Preço específico deste profissional para este serviço
+  price       Float
+  description String? // Descrição personalizada do profissional
+  
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([professionalId, subcategoryId])
+  @@map("professional_subcategories")
+  @@index([professionalId])
+  @@index([subcategoryId])
+  @@index([isActive])
+}
+
+// ============================================
+// ENDEREÇOS
+// ============================================
+
+model Address {
+  id           String  @id @default(cuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  zipCode      String
+  
+  // Coordenadas para cálculo de distância
+  latitude     Float?
+  longitude    Float?
+  
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments Appointment[]
+
+  @@map("addresses")
+  @@index([userId])
+  @@index([isDefault])
+}
+
+// ============================================
+// AGENDAMENTOS
+// ============================================
+
+model Appointment {
+  id            String            @id @default(cuid())
+  orderNumber   String            @unique // Número do pedido visível
+  
+  // Relacionamentos
+  clientId      String
+  client        User              @relation("ClientAppointments", fields: [clientId], references: [id])
+  
+  professionalId String
+  professional   User              @relation("ProfessionalAppointments", fields: [professionalId], references: [id])
+  
+  subcategoryId Int
+  subcategory   Subcategory       @relation(fields: [subcategoryId], references: [id])
+  
+  addressId     String
+  address       Address           @relation(fields: [addressId], references: [id])
+  
+  // Detalhes do agendamento
+  scheduledDate DateTime
+  scheduledTime String            // Ex: "14:00"
+  
+  estimatedDuration Int?          // Em minutos
+  actualDuration    Int?          // Em minutos (após conclusão)
+  
+  status AppointmentStatus @default(PENDING)
+  
+  // Valores
+  price          Float
+  paymentMethod  PaymentMethod?
+  paymentStatus  PaymentStatus  @default(PENDING)
+  
+  // Observações
+  notes          String?        @db.Text
+  cancellationReason String?    @db.Text
+  
+  // Timestamps importantes
+  confirmedAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  review   Review?
+  messages Message[]
+  chat     Chat?
+
+  @@map("appointments")
+  @@index([clientId])
+  @@index([professionalId])
+  @@index([subcategoryId])
+  @@index([status])
+  @@index([scheduledDate])
+  @@index([orderNumber])
+}
+
+// ============================================
+// AVALIAÇÕES
+// ============================================
+
+model Review {
+  id             String  @id @default(cuid())
+  
+  appointmentId  String  @unique
+  appointment    Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  
+  clientId       String
+  client         User    @relation("ClientReviews", fields: [clientId], references: [id])
+  
+  professionalId String
+  professional   User    @relation("ProfessionalReviews", fields: [professionalId], references: [id])
+  
+  rating  Int     // 1-5 estrelas
+  comment String? @db.Text
+  
+  // Avaliações específicas
+  punctuality    Int? // 1-5
+  quality        Int? // 1-5
+  communication  Int? // 1-5
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+  @@index([professionalId])
+  @@index([clientId])
+  @@index([rating])
+}
+
+// ============================================
+// FAVORITOS
+// ============================================
+
+model Favorite {
+  id             String @id @default(cuid())
+  
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  professionalId String
+  
+  createdAt DateTime @default(now())
+
+  @@unique([userId, professionalId])
+  @@map("favorites")
+  @@index([userId])
+  @@index([professionalId])
+}
+
+// ============================================
+// NOTIFICAÇÕES
+// ============================================
+
+model Notification {
+  id      String           @id @default(cuid())
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type    NotificationType
+  title   String
+  message String           @db.Text
+  
+  // Dados adicionais em JSON
+  data    Json?
+  
+  isRead  Boolean          @default(false)
+  
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================
+// CHAT / MENSAGENS
+// ============================================
+
+model Chat {
+  id            String   @id @default(cuid())
+  
+  appointmentId String?  @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@map("chats")
+  @@index([appointmentId])
+}
+
+model ChatParticipant {
+  id     String @id @default(cuid())
+  
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Última leitura
+  lastReadAt DateTime?
+  
+  joinedAt DateTime @default(now())
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+  @@index([chatId])
+  @@index([userId])
+}
+
+model Message {
+  id        String        @id @default(cuid())
+  
+  chatId    String
+  chat      Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  senderId  String
+  sender    User          @relation("SentMessages", fields: [senderId], references: [id])
+  
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  
+  content   String        @db.Text
+  status    MessageStatus @default(SENT)
+  
+  // Anexos (URLs)
+  attachments String[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messages")
+  @@index([chatId])
+  @@index([senderId])
+  @@index([appointmentId])
+  @@index([createdAt])
+}
+
+// ============================================
+// DISPONIBILIDADE DO PROFISSIONAL
+// ============================================
+
+model Availability {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  
+  // Dia da semana (0 = Domingo, 6 = Sábado)
+  dayOfWeek Int
+  
+  // Horários disponíveis
+  startTime String // Ex: "08:00"
+  endTime   String // Ex: "18:00"
+  
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("availability")
+  @@index([professionalId])
+  @@index([dayOfWeek])
+  @@index([isActive])
+}
