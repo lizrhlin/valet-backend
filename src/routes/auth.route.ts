@@ -173,6 +173,147 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
+
+  // Completar registro de profissional
+  fastify.post(
+    '/complete-professional-registration',
+    {
+      schema: {
+        tags: ['auth'],
+        description: 'Complete professional registration with services and details',
+        security: [{ bearerAuth: [] }],
+        body: z.object({
+          specialty: z.string().min(3, 'Especialização deve ter no mínimo 3 caracteres'),
+          description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
+          experience: z.string().min(3, 'Experiência é obrigatória'),
+          location: z.string().min(3, 'Localização é obrigatória'),
+          services: z.array(z.object({
+            subcategoryId: z.number().int().positive('ID da subcategoria inválido'),
+            price: z.string().min(1, 'Preço é obrigatório'), // Formato: "150,00"
+          })).min(1, 'Selecione pelo menos um serviço'),
+        }),
+        response: {
+          200: z.object({
+            message: z.string(),
+            user: z.any(),
+          }),
+          400: z.object({
+            error: z.string(),
+          }),
+          401: z.object({
+            error: z.string(),
+          }),
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        await request.jwtVerify();
+        const userId = request.user.userId;
+
+        const { specialty, description, experience, location, services } = request.body;
+
+        // Verificar se o usuário existe e é profissional
+        const user = await fastify.prisma.user.findUnique({
+          where: { id: userId },
+        });
+
+        if (!user) {
+          reply.code(404);
+          return { error: 'User not found' };
+        }
+
+        if (user.userType !== 'PROFESSIONAL') {
+          reply.code(400);
+          return { error: 'User is not a professional' };
+        }
+
+        // Atualizar dados do profissional
+        const updatedUser = await fastify.prisma.user.update({
+          where: { id: userId },
+          data: {
+            specialty,
+            description,
+            experience,
+            location,
+            status: 'ACTIVE', // Ativar após completar registro
+          },
+        });
+
+        // Extrair categorias únicas dos serviços
+        const subcategoryIds = services.map(s => s.subcategoryId);
+        const subcategories = await fastify.prisma.subcategory.findMany({
+          where: { id: { in: subcategoryIds } },
+          select: { id: true, categoryId: true },
+        });
+
+        const uniqueCategoryIds = [...new Set(subcategories.map(s => s.categoryId))];
+
+        // Criar relacionamentos com categorias
+        await fastify.prisma.professionalCategory.createMany({
+          data: uniqueCategoryIds.map(categoryId => ({
+            professionalId: userId,
+            categoryId,
+          })),
+          skipDuplicates: true,
+        });
+
+        // Criar relacionamentos com subcategorias e preços
+        for (const service of services) {
+          // Converter preço de "150,00" para 150.00
+          const priceFloat = parseFloat(service.price.replace(',', '.'));
+
+          await fastify.prisma.professionalSubcategory.upsert({
+            where: {
+              professionalId_subcategoryId: {
+                professionalId: userId,
+                subcategoryId: service.subcategoryId,
+              },
+            },
+            update: {
+              price: priceFloat,
+              isActive: true,
+            },
+            create: {
+              professionalId: userId,
+              subcategoryId: service.subcategoryId,
+              price: priceFloat,
+              isActive: true,
+            },
+          });
+        }
+
+        // Buscar usuário atualizado com relacionamentos
+        const userWithServices = await fastify.prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+            subcategories: {
+              include: {
+                subcategory: true,
+              },
+            },
+          },
+        });
+
+        // Remover senha do retorno
+        const { password: _, ...userWithoutPassword } = userWithServices!;
+
+        return {
+          message: 'Professional registration completed successfully',
+          user: userWithoutPassword,
+        };
+      } catch (error) {
+        console.error('Error completing professional registration:', error);
+        reply.code(400);
+        return { error: error instanceof Error ? error.message : 'Failed to complete registration' };
+      }
+    }
+  );
 };
 
 export default authRoute;

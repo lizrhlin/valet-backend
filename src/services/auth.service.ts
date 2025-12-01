@@ -17,12 +17,23 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
   // Hash da senha
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-  // Criar usuário
+  // Criar usuário (todos os campos agora estão na mesma tabela)
   const user = await prisma.user.create({
     data: {
       email: input.email,
       name: input.name,
       password: hashedPassword,
+      phone: input.phone,
+      userType: input.userType,
+      // Campos específicos de profissionais (serão atualizados depois)
+      ...(input.userType === 'PROFESSIONAL' && {
+        specialty: 'Profissional',
+        description: 'Novo profissional cadastrado',
+        experience: 'A definir',
+        location: 'São Paulo, SP',
+        available: true,
+        isVerified: false,
+      }),
     },
   });
 

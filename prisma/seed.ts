@@ -20,7 +20,6 @@ async function main() {
   await prisma.subcategory.deleteMany();
   await prisma.category.deleteMany();
   await prisma.address.deleteMany();
-  await prisma.professional.deleteMany();
   await prisma.user.deleteMany();
 
   console.log('✅ Dados anteriores limpos');
@@ -364,7 +363,7 @@ async function main() {
 
   // Profissional de teste - Eletricista
   const professionalPassword = await bcrypt.hash('Profissional@123', 10);
-  const professionalUser = await prisma.user.create({
+  const professional = await prisma.user.create({
     data: {
       email: 'eletricista@teste.com',
       name: 'Carlos Oliveira',
@@ -373,12 +372,7 @@ async function main() {
       userType: UserType.PROFESSIONAL,
       status: 'ACTIVE',
       cpf: '123.456.789-00',
-    },
-  });
-
-  const professional = await prisma.professional.create({
-    data: {
-      userId: professionalUser.id,
+      // Campos específicos de profissional
       specialty: 'Eletricista',
       description: 'Eletricista com 10 anos de experiência em instalações residenciais e comerciais.',
       experience: '10 anos',
@@ -388,10 +382,10 @@ async function main() {
       available: true,
       isVerified: true,
       rating: 4.8,
-      reviewCount: 42,
-      servicesCompleted: 156,
     },
   });
+
+  console.log('✅ Profissional de teste criado:', professional.email);
 
   // Vincular profissional à categoria Elétrica
   await prisma.professionalCategory.create({
@@ -452,10 +446,10 @@ async function main() {
     },
   });
 
-  console.log('✅ Profissional eletricista criado:', professionalUser.email);
+  // console.log('✅ Profissional eletricista criado já foi exibido acima');
 
   // Profissional de teste - Encanador
-  const encanadorUser = await prisma.user.create({
+  const encanador = await prisma.user.create({
     data: {
       email: 'encanador@teste.com',
       name: 'Pedro Santos',
@@ -464,12 +458,7 @@ async function main() {
       userType: UserType.PROFESSIONAL,
       status: 'ACTIVE',
       cpf: '987.654.321-00',
-    },
-  });
-
-  const encanador = await prisma.professional.create({
-    data: {
-      userId: encanadorUser.id,
+      // Campos específicos de profissional
       specialty: 'Encanador',
       description: 'Encanador especializado em desentupimentos e instalações hidráulicas.',
       experience: '8 anos',
@@ -479,10 +468,10 @@ async function main() {
       available: true,
       isVerified: true,
       rating: 4.9,
-      reviewCount: 38,
-      servicesCompleted: 124,
     },
   });
+
+  console.log('✅ Profissional encanador criado:', encanador.email);
 
   await prisma.professionalCategory.create({
     data: {
@@ -507,14 +496,13 @@ async function main() {
     });
   }
 
-  console.log('✅ Profissional encanador criado:', encanadorUser.email);
+  // console.log('✅ Profissional encanador criado já foi exibido acima');
 
   console.log('\n🎉 Seed concluído com sucesso!');
   console.log('\n📊 Resumo:');
   console.log(`   - ${await prisma.category.count()} categorias`);
   console.log(`   - ${await prisma.subcategory.count()} subcategorias`);
   console.log(`   - ${await prisma.user.count()} usuários`);
-  console.log(`   - ${await prisma.professional.count()} profissionais`);
   console.log('\n🔑 Credenciais de teste:');
   console.log('   Admin: admin@liz.com / Admin@123');
   console.log('   Cliente: cliente@teste.com / Cliente@123');

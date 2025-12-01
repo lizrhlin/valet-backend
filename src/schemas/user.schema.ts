@@ -19,9 +19,26 @@ export const registerSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
   email: emailSchema,
   password: passwordSchema,
-  phone: phoneSchema,
+  phone: phoneSchema.optional(),
   userType: userTypeSchema.default('CLIENT'),
-  cpf: cpfSchema,
+  cpf: cpfSchema.optional(),
+});
+
+// ============================================
+// REGISTRO DE PROFISSIONAL (COM SERVIÇOS)
+// ============================================
+
+export const professionalServiceSchema = z.object({
+  subcategoryId: z.number().int().positive('ID da subcategoria inválido'),
+  price: z.string().min(1, 'Preço é obrigatório'), // Formato: "150,00"
+});
+
+export const completeProfessionalRegistrationSchema = z.object({
+  specialty: z.string().min(3, 'Especialização deve ter no mínimo 3 caracteres'),
+  description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
+  experience: z.string().min(3, 'Experiência é obrigatória'),
+  location: z.string().min(3, 'Localização é obrigatória'),
+  services: z.array(professionalServiceSchema).min(1, 'Selecione pelo menos um serviço'),
 });
 
 export const loginSchema = z.object({
@@ -85,15 +102,19 @@ export const userResponseSchema = z.object({
   id: idSchema,
   name: z.string(),
   email: z.string().email(),
-  phone: z.string().optional(),
-  avatar: z.string().optional(),
+  phone: z.string().nullable().optional(),
+  avatar: z.string().nullable().optional(),
   userType: userTypeSchema,
   status: userStatusSchema,
   notificationsEnabled: z.boolean(),
   darkMode: z.boolean(),
   language: z.string(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.union([z.string().datetime(), z.date()]).transform(val => 
+    val instanceof Date ? val.toISOString() : val
+  ),
+  updatedAt: z.union([z.string().datetime(), z.date()]).transform(val => 
+    val instanceof Date ? val.toISOString() : val
+  ),
 });
 
 export const authResponseSchema = z.object({
@@ -115,3 +136,5 @@ export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchem
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type UserResponse = z.infer<typeof userResponseSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
+export type ProfessionalService = z.infer<typeof professionalServiceSchema>;
+export type CompleteProfessionalRegistrationInput = z.infer<typeof completeProfessionalRegistrationSchema>;

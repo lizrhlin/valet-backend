@@ -95,12 +95,36 @@ model User {
   resetPasswordToken String?
   resetPasswordExpires DateTime?
 
+  // ===== CAMPOS ESPECÍFICOS DE PROFISSIONAIS (NULL para clientes) =====
+  specialty        String?  // Especialização principal
+  description      String?  @db.Text
+  experience       String?  // Ex: "5 anos", "Iniciante"
+  servicesCompleted Int     @default(0) @map("services_completed")
+  
+  // Disponibilidade do profissional
+  available   Boolean @default(true)
+  isVerified  Boolean @default(false) @map("is_verified")
+  
+  // Localização do profissional
+  location    String?
+  latitude    Float?
+  longitude   Float?
+  
+  // Avaliações (calculados)
+  rating       Float @default(0)
+  reviewCount  Int   @default(0) @map("review_count")
+  
+  // Tempo de resposta médio (em minutos)
+  avgResponseTime Int? @map("avg_response_time")
+  
+  // Última vez online
+  lastSeen DateTime? @map("last_seen")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relacionamentos
   addresses       Address[]
-  professionalProfile Professional?
   
   // Como cliente
   appointmentsAsClient Appointment[] @relation("ClientAppointments")
@@ -111,6 +135,9 @@ model User {
   // Como profissional
   appointmentsAsProfessional Appointment[] @relation("ProfessionalAppointments")
   reviewsAsProfessional      Review[]      @relation("ProfessionalReviews")
+  categories                 ProfessionalCategory[] @relation("ProfessionalCategories")
+  subcategories              ProfessionalSubcategory[] @relation("ProfessionalSubcategories")
+  availability               Availability[]
   
   // Notificações e Chat
   notifications   Notification[]
@@ -120,54 +147,8 @@ model User {
   @@index([email])
   @@index([userType])
   @@index([status])
-}
-
-// ============================================
-// PERFIL PROFISSIONAL
-// ============================================
-
-model Professional {
-  id          String  @id @default(cuid())
-  userId      String  @unique
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Informações profissionais
-  specialty        String  // Especialização principal
-  description      String  @db.Text
-  experience       String  // Ex: "5 anos", "Iniciante"
-  servicesCompleted Int    @default(0)
-  
-  // Disponibilidade
-  available   Boolean @default(true)
-  isVerified  Boolean @default(false)
-  
-  // Localização
-  location    String
-  latitude    Float?
-  longitude   Float?
-  
-  // Avaliações (calculados)
-  rating       Float @default(0)
-  reviewCount  Int   @default(0)
-  
-  // Tempo de resposta médio (em minutos)
-  avgResponseTime Int?
-  
-  // Última vez online
-  lastSeen DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relacionamentos
-  categories    ProfessionalCategory[]
-  subcategories ProfessionalSubcategory[]
-  availability  Availability[]
-
-  @@map("professionals")
-  @@index([userId])
+  @@index([location])
   @@index([available])
-  @@index([rating])
 }
 
 // ============================================
@@ -229,13 +210,13 @@ model Subcategory {
   @@index([isActive])
 }
 
-// Relacionamento N:N entre Profissional e Categoria
+// Relacionamento N:N entre Profissional (User) e Categoria
 model ProfessionalCategory {
-  id             String       @id @default(cuid())
+  id             String   @id @default(cuid())
   professionalId String
-  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professional   User     @relation(fields: [professionalId], references: [id], onDelete: Cascade, name: "ProfessionalCategories")
   categoryId     Int
-  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -245,13 +226,13 @@ model ProfessionalCategory {
   @@index([categoryId])
 }
 
-// Relacionamento N:N entre Profissional e Subcategoria (com preço)
+// Relacionamento N:N entre Profissional (User) e Subcategoria (com preço)
 model ProfessionalSubcategory {
-  id             String       @id @default(cuid())
+  id             String      @id @default(cuid())
   professionalId String
-  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professional   User        @relation(fields: [professionalId], references: [id], onDelete: Cascade, name: "ProfessionalSubcategories")
   subcategoryId  Int
-  subcategory    Subcategory  @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+  subcategory    Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
   
   // Preço específico deste profissional para este serviço
   price       Float
@@ -517,9 +498,9 @@ model Message {
 // ============================================
 
 model Availability {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   professionalId String
-  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professional   User   @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   
   // Dia da semana (0 = Domingo, 6 = Sábado)
   dayOfWeek Int
