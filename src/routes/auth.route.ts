@@ -308,7 +308,6 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           user: userWithoutPassword,
         };
       } catch (error) {
-        console.error('Error completing professional registration:', error);
         reply.code(400);
         return { error: error instanceof Error ? error.message : 'Failed to complete registration' };
       }

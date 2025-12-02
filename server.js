@@ -14,8 +14,6 @@ server.post('/usuarios', async (request, reply) => {
         email,
     }),
 
-  console.log(database.list());
-
   return reply.status(201).send();
 })
 
@@ -23,8 +21,6 @@ server.get('/usuarios', async (request, reply) => {
     const { search } = request.query
 
     const usuarios = database.list(search);
-
-    console.log(usuarios);
 
   return usuarios;
 })
