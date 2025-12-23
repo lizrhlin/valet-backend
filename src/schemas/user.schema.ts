@@ -22,6 +22,24 @@ export const registerSchema = z.object({
   phone: phoneSchema.optional(),
   userType: userTypeSchema.default('CLIENT'),
   cpf: cpfSchema.optional(),
+  // Campos para profissionais
+  specialty: z.string().optional(),
+  experience: z.string().optional(),
+  description: z.string().optional(),
+  // Serviços do profissional (subcategorias com preços)
+  services: z.array(z.object({
+    subcategoryId: z.number().int().positive(),
+    price: z.string(), // Formato: "150,00"
+  })).optional(),
+  address: z.object({
+    street: z.string().optional(),
+    number: z.string().optional(),
+    complement: z.string().optional(),
+    neighborhood: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+  }).optional(),
 });
 
 // ============================================
