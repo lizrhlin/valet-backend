@@ -71,11 +71,11 @@ export const categoryResponseSchema = z.object({
   slug: z.string(),
   icon: z.string(),
   backgroundColor: z.string(),
-  description: z.string().nullable(),
+  description: z.string().nullish(),
   isActive: z.boolean(),
   order: z.number(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const subcategoryResponseSchema = z.object({
@@ -83,15 +83,15 @@ export const subcategoryResponseSchema = z.object({
   categoryId: z.number(),
   name: z.string(),
   slug: z.string(),
-  description: z.string().nullable(),
-  suggestedMinPrice: z.number().nullable(),
-  suggestedMaxPrice: z.number().nullable(),
-  estimatedDuration: z.number().nullable(),
-  imageUrl: z.string().nullable(),
+  description: z.string().nullish(),
+  suggestedMinPrice: z.number().nullish(),
+  suggestedMaxPrice: z.number().nullish(),
+  estimatedDuration: z.number().nullish(),
+  imageUrl: z.string().nullish(),
   isActive: z.boolean(),
   order: z.number(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const categoryWithSubcategoriesResponseSchema = categoryResponseSchema.extend({
