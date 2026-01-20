@@ -14,7 +14,7 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
 
   // Listar endereços do usuário
   fastify.get(
-    '/user/addresses',
+    '/addresses',
     {
       schema: {
         tags: ['addresses'],
@@ -45,7 +45,7 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
 
   // Buscar endereço por ID
   fastify.get<{ Params: { addressId: string } }>(
-    '/user/addresses/:addressId',
+    '/addresses/:addressId',
     {
       schema: {
         tags: ['addresses'],
@@ -86,7 +86,7 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
 
   // Criar novo endereço
   fastify.post(
-    '/user/addresses',
+    '/addresses',
     {
       schema: {
         tags: ['addresses'],
@@ -127,7 +127,7 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
 
   // Atualizar endereço
   fastify.put<{ Params: { addressId: string } }>(
-    '/user/addresses/:addressId',
+    '/addresses/:addressId',
     {
       schema: {
         tags: ['addresses'],
@@ -183,7 +183,7 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
 
   // Deletar endereço
   fastify.delete<{ Params: { addressId: string } }>(
-    '/user/addresses/:addressId',
+    '/addresses/:addressId',
     {
       schema: {
         tags: ['addresses'],
@@ -224,7 +224,7 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
 
   // Marcar endereço como padrão
   fastify.patch<{ Params: { addressId: string } }>(
-    '/user/addresses/:addressId/set-default',
+    '/addresses/:addressId/set-default',
     {
       schema: {
         tags: ['addresses'],

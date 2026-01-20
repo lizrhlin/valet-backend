@@ -106,11 +106,11 @@ export async function buildApp() {
   await app.register(usersRoute, { prefix: '/users' });
   await app.register(categoryRoute, { prefix: '/api' });
   await app.register(professionalRoute, { prefix: '/api' });
-  await app.register(appointmentRoute, { prefix: '' });
-  await app.register(addressRoute, { prefix: '' });
-  await app.register(favoriteRoute, { prefix: '' });
-  await app.register(reviewRoute, { prefix: '' });
-  await app.register(notificationRoute, { prefix: '' });
+  await app.register(appointmentRoute, { prefix: '/api' });
+  await app.register(addressRoute, { prefix: '/api' });
+  await app.register(favoriteRoute, { prefix: '/api' });
+  await app.register(reviewRoute, { prefix: '/api' });
+  await app.register(notificationRoute, { prefix: '/api' });
 
   return app;
 }
