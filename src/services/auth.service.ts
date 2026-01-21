@@ -19,7 +19,21 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
   });
 
   if (existingUser) {
-    throw new Error('Email already registered');
+    throw new Error('E-mail já cadastrado');
+  }
+
+  // Verificar se o CPF já existe para o mesmo tipo de usuário
+  if (input.cpf) {
+    const existingCpf = await prisma.user.findFirst({
+      where: { 
+        cpf: input.cpf,
+        userType: input.userType,
+      },
+    });
+
+    if (existingCpf) {
+      throw new Error(`CPF já cadastrado como ${input.userType === 'PROFESSIONAL' ? 'profissional' : 'cliente'}`);
+    }
   }
 
   // Hash da senha
@@ -117,14 +131,14 @@ export async function login(prisma: PrismaClient, input: LoginInput) {
   });
 
   if (!user) {
-    throw new Error('Invalid credentials');
+    throw new Error('Credenciais inválidas');
   }
 
   // Verificar senha
   const isValid = await bcrypt.compare(input.password, user.password);
 
   if (!isValid) {
-    throw new Error('Invalid credentials');
+    throw new Error('Credenciais inválidas');
   }
 
   // Remover senha do retorno

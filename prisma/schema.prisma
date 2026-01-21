@@ -81,7 +81,7 @@ model User {
   status    UserStatus @default(PENDING_VERIFICATION)
   
   // Documentos para verificação
-  cpf              String?  @unique
+  cpf              String?
   rg               String?
   verificationDocs String[] // URLs dos documentos
 
@@ -144,6 +144,7 @@ model User {
   chatParticipants ChatParticipant[]
 
   @@map("users")
+  @@unique([cpf, userType], name: "unique_cpf_usertype")
   @@index([email])
   @@index([userType])
   @@index([status])
