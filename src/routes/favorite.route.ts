@@ -103,9 +103,12 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
       const { professionalId } = request.body as { professionalId: string };
 
-      // Verificar se profissional existe
-      const professional = await fastify.prisma.professional.findUnique({
-        where: { id: professionalId },
+      // Verificar se profissional existe (buscar em User com userType PROFESSIONAL)
+      const professional = await fastify.prisma.user.findFirst({
+        where: { 
+          id: professionalId,
+          userType: 'PROFESSIONAL'
+        },
       });
 
       if (!professional) {
