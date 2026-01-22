@@ -25,10 +25,10 @@ const securityPlugin: FastifyPluginAsync = async (fastify) => {
     credentials: true,
   });
 
-  // Rate Limiting
+  // Rate Limiting - Mais permissivo em desenvolvimento
   await fastify.register(rateLimit, {
-    max: 100,
-    timeWindow: '15 minutes',
+    max: fastify.config.NODE_ENV === 'production' ? 100 : 1000, // 1000 requisições em dev
+    timeWindow: fastify.config.NODE_ENV === 'production' ? '15 minutes' : '1 minute', // 1 minuto em dev
     errorResponseBuilder: () => ({
       statusCode: 429,
       error: 'Too Many Requests',
