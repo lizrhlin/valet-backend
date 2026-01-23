@@ -138,6 +138,7 @@ model User {
   categories                 ProfessionalCategory[] @relation("ProfessionalCategories")
   subcategories              ProfessionalSubcategory[] @relation("ProfessionalSubcategories")
   availability               Availability[]
+  customAvailability         CustomAvailability[] @relation("CustomAvailability")
   
   // Notificações e Chat
   notifications   Notification[]
@@ -519,4 +520,27 @@ model Availability {
   @@index([professionalId])
   @@index([dayOfWeek])
   @@index([isActive])
+}
+
+// Disponibilidade específica por data (sobrescreve a disponibilidade semanal)
+model CustomAvailability {
+  id             String @id @default(cuid())
+  professionalId String
+  professional   User   @relation("CustomAvailability", fields: [professionalId], references: [id], onDelete: Cascade)
+  
+  // Data específica
+  date DateTime @db.Date
+  
+  // Horário específico
+  timeSlot String // Ex: "08:00", "08:30", etc.
+  
+  isAvailable Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("custom_availability")
+  @@unique([professionalId, date, timeSlot])
+  @@index([professionalId])
+  @@index([date])
 }

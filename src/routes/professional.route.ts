@@ -476,6 +476,126 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       };
     }
   );
+
+  // Buscar disponibilidade customizada (por data específica)
+  fastify.get<{
+    Params: { professionalId: string };
+    Querystring: { startDate?: string; endDate?: string };
+  }>(
+    '/professionals/:professionalId/custom-availability',
+    {
+      schema: {
+        tags: ['professionals'],
+        description: 'Get professional custom availability by date',
+        params: professionalIdParamSchema,
+        querystring: z.object({
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { professionalId } = request.params;
+      const { startDate, endDate } = request.query;
+
+      const where: any = { professionalId };
+
+      if (startDate || endDate) {
+        where.date = {};
+        if (startDate) where.date.gte = new Date(startDate);
+        if (endDate) where.date.lte = new Date(endDate);
+      }
+
+      const customAvailability = await fastify.prisma.customAvailability.findMany({
+        where,
+        orderBy: [{ date: 'asc' }, { timeSlot: 'asc' }],
+      });
+
+      return { customAvailability };
+    }
+  );
+
+  // Salvar disponibilidade customizada (por data específica)
+  fastify.put<{
+    Params: { professionalId: string };
+    Body: {
+      schedules: Array<{
+        date: string;
+        timeSlots: string[];
+      }>;
+    };
+  }>(
+    '/professionals/:professionalId/custom-availability',
+    {
+      schema: {
+        tags: ['professionals'],
+        description: 'Update professional custom availability',
+        params: professionalIdParamSchema,
+        body: z.object({
+          schedules: z.array(z.object({
+            date: z.string(),
+            timeSlots: z.array(z.string()),
+          })),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { professionalId } = request.params;
+      const { schedules } = request.body;
+
+      // Verificar se profissional existe
+      const professional = await fastify.prisma.user.findUnique({
+        where: { id: professionalId },
+      });
+
+      if (!professional || professional.userType !== 'PROFESSIONAL') {
+        reply.code(404);
+        return { error: 'Professional not found' };
+      }
+
+      // DELETAR TODAS as disponibilidades antigas do profissional
+      await fastify.prisma.customAvailability.deleteMany({
+        where: { professionalId },
+      });
+
+      // Criar novas disponibilidades
+      const customAvailabilityData = schedules.flatMap(schedule => {
+        // Garantir que a data seja interpretada como UTC meio-dia para evitar problemas de timezone
+        const [year, month, day] = schedule.date.split('-').map(Number);
+        const dateUTC = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        
+        return schedule.timeSlots.map(timeSlot => ({
+          professionalId,
+          date: dateUTC,
+          timeSlot,
+          isAvailable: true,
+        }));
+      });
+
+      console.log('Dados a serem salvos:', customAvailabilityData.length, 'registros');
+      console.log('Primeiro registro:', customAvailabilityData[0]);
+
+      if (customAvailabilityData.length > 0) {
+        const result = await fastify.prisma.customAvailability.createMany({
+          data: customAvailabilityData,
+        });
+        console.log('Registros inseridos:', result.count);
+      }
+
+      // Verificar se realmente salvou
+      const saved = await fastify.prisma.customAvailability.findMany({
+        where: { professionalId },
+        orderBy: [{ date: 'asc' }, { timeSlot: 'asc' }],
+      });
+      console.log('Registros salvos no banco:', saved.length);
+
+      return {
+        message: 'Custom availability updated successfully',
+        count: customAvailabilityData.length,
+        savedCount: saved.length,
+      };
+    }
+  );
 };
 
 export default professionalRoute;
