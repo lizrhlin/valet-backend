@@ -244,6 +244,126 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Atualizar disponibilidade do profissional
+  fastify.put<{
+    Params: { professionalId: string };
+    Body: {
+      availability: Array<{
+        dayOfWeek: number;
+        startTime: string;
+        endTime: string;
+        isActive: boolean;
+      }>;
+    };
+  }>(
+    '/professionals/:professionalId/availability',
+    {
+      schema: {
+        tags: ['professionals'],
+        description: 'Update professional availability',
+        params: professionalIdParamSchema,
+        body: z.object({
+          availability: z.array(z.object({
+            dayOfWeek: z.number().int().min(0).max(6),
+            startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+            endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+            isActive: z.boolean().optional().default(true),
+          })),
+        }),
+        response: {
+          200: z.object({
+            message: z.string(),
+            availability: z.array(z.any()),
+          }),
+          404: z.object({ error: z.string() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { professionalId } = request.params;
+      const { availability } = request.body;
+
+      // Verificar se profissional existe
+      const professional = await fastify.prisma.user.findUnique({
+        where: { id: professionalId },
+      });
+
+      if (!professional || professional.userType !== 'PROFESSIONAL') {
+        reply.code(404);
+        return { error: 'Professional not found' };
+      }
+
+      // Buscar disponibilidades existentes
+      const existingAvailability = await fastify.prisma.availability.findMany({
+        where: { professionalId },
+      });
+
+      // IDs das disponibilidades que vieram na requisição (usar dayOfWeek + horário como identificador)
+      const incomingKeys = availability.map(a => 
+        `${a.dayOfWeek}-${a.startTime}-${a.endTime}`
+      );
+      
+      // IDs das disponibilidades existentes
+      const existingKeys = existingAvailability.map(a => 
+        `${a.dayOfWeek}-${a.startTime}-${a.endTime}`
+      );
+
+      // Remover disponibilidades que não estão mais na lista
+      const toRemove = existingAvailability.filter(existing => {
+        const key = `${existing.dayOfWeek}-${existing.startTime}-${existing.endTime}`;
+        return !incomingKeys.includes(key);
+      });
+      
+      if (toRemove.length > 0) {
+        await fastify.prisma.availability.deleteMany({
+          where: {
+            id: { in: toRemove.map(a => a.id) },
+          },
+        });
+      }
+
+      // Upsert (criar ou atualizar) cada disponibilidade
+      for (const avail of availability) {
+        const key = `${avail.dayOfWeek}-${avail.startTime}-${avail.endTime}`;
+        const existing = existingAvailability.find(e => 
+          `${e.dayOfWeek}-${e.startTime}-${e.endTime}` === key
+        );
+
+        if (existing) {
+          // Atualizar se já existe
+          await fastify.prisma.availability.update({
+            where: { id: existing.id },
+            data: {
+              isActive: avail.isActive ?? true,
+            },
+          });
+        } else {
+          // Criar se não existe
+          await fastify.prisma.availability.create({
+            data: {
+              professionalId,
+              dayOfWeek: avail.dayOfWeek,
+              startTime: avail.startTime,
+              endTime: avail.endTime,
+              isActive: avail.isActive ?? true,
+            },
+          });
+        }
+      }
+
+      // Buscar disponibilidades atualizadas para retornar
+      const updatedAvailability = await fastify.prisma.availability.findMany({
+        where: { professionalId },
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      });
+
+      return {
+        message: 'Availability updated successfully',
+        availability: updatedAvailability,
+      };
+    }
+  );
+
   // Atualizar serviços do profissional
   fastify.put<{
     Params: { professionalId: string };
