@@ -243,6 +243,119 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       return { availability };
     }
   );
+
+  // Atualizar serviços do profissional
+  fastify.put<{
+    Params: { professionalId: string };
+    Body: {
+      subcategories: Array<{
+        subcategoryId: number;
+        price: number;
+        isActive: boolean;
+      }>;
+    };
+  }>(
+    '/professionals/:professionalId/services',
+    {
+      schema: {
+        tags: ['professionals'],
+        description: 'Update professional services',
+        params: professionalIdParamSchema,
+        body: z.object({
+          subcategories: z.array(z.object({
+            subcategoryId: z.number().int().positive(),
+            price: z.number().positive(),
+            isActive: z.boolean().optional().default(true),
+          })),
+        }),
+        response: {
+          200: z.object({
+            message: z.string(),
+            subcategories: z.array(z.any()),
+          }),
+          404: z.object({ error: z.string() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { professionalId } = request.params;
+      const { subcategories } = request.body;
+
+      // Verificar se profissional existe
+      const professional = await fastify.prisma.user.findUnique({
+        where: { id: professionalId },
+      });
+
+      if (!professional || professional.userType !== 'PROFESSIONAL') {
+        reply.code(404);
+        return { error: 'Professional not found' };
+      }
+
+      // Buscar subcategorias existentes
+      const existingSubcategories = await fastify.prisma.professionalSubcategory.findMany({
+        where: { professionalId },
+      });
+
+      // IDs das subcategorias que vieram na requisição
+      const incomingSubcategoryIds = subcategories.map(s => s.subcategoryId);
+      
+      // IDs das subcategorias existentes
+      const existingSubcategoryIds = existingSubcategories.map(s => s.subcategoryId);
+
+      // Remover subcategorias que não estão mais na lista
+      const toRemove = existingSubcategoryIds.filter(id => !incomingSubcategoryIds.includes(id));
+      if (toRemove.length > 0) {
+        await fastify.prisma.professionalSubcategory.deleteMany({
+          where: {
+            professionalId,
+            subcategoryId: { in: toRemove },
+          },
+        });
+      }
+
+      // Upsert (criar ou atualizar) cada subcategoria
+      for (const sub of subcategories) {
+        await fastify.prisma.professionalSubcategory.upsert({
+          where: {
+            professionalId_subcategoryId: {
+              professionalId,
+              subcategoryId: sub.subcategoryId,
+            },
+          },
+          update: {
+            price: sub.price,
+            isActive: sub.isActive ?? true,
+          },
+          create: {
+            professionalId,
+            subcategoryId: sub.subcategoryId,
+            price: sub.price,
+            isActive: sub.isActive ?? true,
+          },
+        });
+      }
+
+      // Buscar subcategorias atualizadas para retornar
+      const updatedSubcategories = await fastify.prisma.professionalSubcategory.findMany({
+        where: { professionalId },
+        include: {
+          subcategory: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              categoryId: true,
+            },
+          },
+        },
+      });
+
+      return {
+        message: 'Services updated successfully',
+        subcategories: updatedSubcategories,
+      };
+    }
+  );
 };
 
 export default professionalRoute;
