@@ -27,9 +27,17 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         userType: 'PROFESSIONAL', // Filtra apenas profissionais
       };
 
-      if (available !== undefined) {
-        where.available = available;
+      // Se available for undefined, não filtrar por disponibilidade
+      // (mostra todos, incluindo null que serão tratados como disponíveis)
+      // Se available=true, mostrar apenas os com agenda aberta
+      // Se available=false, mostrar apenas os com agenda fechada
+      if (available === true) {
+        where.available = true;
+      } else if (available === false) {
+        where.available = false;
       }
+      // Se available === undefined, não adiciona nenhum filtro
+      // (backend considera null como disponível por padrão)
 
       if (minRating) {
         where.rating = { gte: minRating };
@@ -593,6 +601,56 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         message: 'Custom availability updated successfully',
         count: customAvailabilityData.length,
         savedCount: saved.length,
+      };
+    }
+  );
+
+  // Atualizar status de disponibilidade (agenda aberta/fechada)
+  fastify.patch<{
+    Params: { professionalId: string };
+    Body: { available: boolean };
+  }>(
+    '/professionals/:professionalId',
+    {
+      schema: {
+        tags: ['professionals'],
+        description: 'Update professional availability status',
+        params: professionalIdParamSchema,
+        body: z.object({
+          available: z.boolean(),
+        }),
+        response: {
+          200: z.object({
+            message: z.string(),
+            available: z.boolean(),
+          }),
+          404: z.object({ error: z.string() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { professionalId } = request.params;
+      const { available } = request.body;
+
+      // Verificar se profissional existe
+      const professional = await fastify.prisma.user.findUnique({
+        where: { id: professionalId },
+      });
+
+      if (!professional || professional.userType !== 'PROFESSIONAL') {
+        reply.code(404);
+        return { error: 'Professional not found' };
+      }
+
+      // Atualizar status
+      await fastify.prisma.user.update({
+        where: { id: professionalId },
+        data: { available },
+      });
+
+      return {
+        message: 'Availability status updated successfully',
+        available,
       };
     }
   );
