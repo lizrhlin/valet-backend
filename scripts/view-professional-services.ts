@@ -4,8 +4,6 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('\n📋 CATEGORIAS DOS PROFISSIONAIS:\n');
-  console.log('='.repeat(80));
   
   const professionalCategories = await prisma.professionalCategory.findMany({
     include: {
@@ -23,13 +21,8 @@ async function main() {
   });
 
   for (const pc of professionalCategories) {
-    console.log(`👤 ${pc.professional.name} (${pc.professional.email})`);
-    console.log(`   📁 Categoria: ${pc.category.name} ${pc.category.icon}`);
-    console.log('');
   }
 
-  console.log('\n📋 SUBCATEGORIAS (SERVIÇOS) DOS PROFISSIONAIS:\n');
-  console.log('='.repeat(80));
 
   const professionalSubcategories = await prisma.professionalSubcategory.findMany({
     include: {
@@ -55,14 +48,9 @@ async function main() {
   for (const ps of professionalSubcategories) {
     if (currentProfessional !== ps.professional.email) {
       currentProfessional = ps.professional.email;
-      console.log(`\n👤 ${ps.professional.name} (${ps.professional.email})`);
-      console.log('-'.repeat(60));
     }
-    console.log(`   📁 ${ps.subcategory.category.name} > ${ps.subcategory.name}`);
-    console.log(`      💰 Preço: R$ ${ps.price.toFixed(2)} | Ativo: ${ps.isActive ? '✅' : '❌'}`);
   }
 
-  console.log('\n');
 }
 
 main()

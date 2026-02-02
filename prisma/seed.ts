@@ -4,7 +4,6 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seed do banco de dados...');
 
   // Limpar dados existentes (cuidado em produção!)
   await prisma.message.deleteMany();
@@ -22,7 +21,6 @@ async function main() {
   await prisma.address.deleteMany();
   await prisma.user.deleteMany();
 
-  console.log('✅ Dados anteriores limpos');
 
   // ============================================
   // CATEGORIAS E SUBCATEGORIAS
@@ -305,7 +303,6 @@ async function main() {
     ],
   });
 
-  console.log('✅ Categorias e subcategorias criadas');
 
   // ============================================
   // USUÁRIO ADMIN
@@ -323,7 +320,6 @@ async function main() {
     },
   });
 
-  console.log('✅ Usuário admin criado:', admin.email);
 
   // ============================================
   // USUÁRIOS DE TESTE
@@ -359,7 +355,6 @@ async function main() {
     },
   });
 
-  console.log('✅ Cliente de teste criado:', client.email);
 
   // Profissional de teste - Eletricista
   const professionalPassword = await bcrypt.hash('Profissional@123', 10);
@@ -385,7 +380,6 @@ async function main() {
     },
   });
 
-  console.log('✅ Profissional de teste criado:', professional.email);
 
   // Vincular profissional à categoria Elétrica
   await prisma.professionalCategory.create({
@@ -446,8 +440,6 @@ async function main() {
     },
   });
 
-  // console.log('✅ Profissional eletricista criado já foi exibido acima');
-
   // Profissional de teste - Encanador
   const encanador = await prisma.user.create({
     data: {
@@ -471,7 +463,6 @@ async function main() {
     },
   });
 
-  console.log('✅ Profissional encanador criado:', encanador.email);
 
   await prisma.professionalCategory.create({
     data: {
@@ -496,23 +487,10 @@ async function main() {
     });
   }
 
-  // console.log('✅ Profissional encanador criado já foi exibido acima');
-
-  console.log('\n🎉 Seed concluído com sucesso!');
-  console.log('\n📊 Resumo:');
-  console.log(`   - ${await prisma.category.count()} categorias`);
-  console.log(`   - ${await prisma.subcategory.count()} subcategorias`);
-  console.log(`   - ${await prisma.user.count()} usuários`);
-  console.log('\n🔑 Credenciais de teste:');
-  console.log('   Admin: admin@liz.com / Admin@123');
-  console.log('   Cliente: cliente@teste.com / Cliente@123');
-  console.log('   Eletricista: eletricista@teste.com / Profissional@123');
-  console.log('   Encanador: encanador@teste.com / Profissional@123');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Erro durante seed:', e);
     process.exit(1);
   })
   .finally(async () => {

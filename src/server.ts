@@ -14,7 +14,6 @@ const start = async () => {
     app.log.info(`📚 Docs available at http://${host}:${port}/docs`);
     app.log.info(`📊 Metrics available at http://${host}:${port}/metrics`);
   } catch (err) {
-    console.error('Failed to start server:', err);
     process.exit(1);
   }
 };

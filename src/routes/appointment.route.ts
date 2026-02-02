@@ -26,14 +26,6 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
       const data = request.body as z.infer<typeof createAppointmentSchema>;
 
       // 🔍 Log dos dados recebidos
-      console.log('=== APPOINTMENT DATA ===');
-      console.log('userId:', userId);
-      console.log('professionalId:', data.professionalId);
-      console.log('subcategoryId:', data.subcategoryId);
-      console.log('addressId:', data.addressId);
-      console.log('scheduledDate:', data.scheduledDate);
-      console.log('scheduledTime:', data.scheduledTime);
-      console.log('========================');
 
       // Verificar se o profissional existe
       const professionalProfile = await fastify.prisma.user.findUnique({
@@ -63,10 +55,6 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         where: { id: data.addressId, userId },
       });
 
-      console.log('=== ADDRESS LOOKUP ===');
-      console.log('Looking for addressId:', data.addressId);
-      console.log('With userId:', userId);
-      console.log('Found:', !!address);
       
       if (!address) {
         // Mostrar endereços disponíveis para debug
@@ -74,15 +62,12 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           where: { userId },
           select: { id: true, street: true, number: true, isDefault: true },
         });
-        console.log('Available addresses for this user:', userAddresses);
       } else {
-        console.log('Address details:', {
           id: address.id,
           userId: address.userId,
           street: address.street,
         });
       }
-      console.log('=====================');
 
       if (!address) {
         reply.code(404);

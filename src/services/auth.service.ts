@@ -5,7 +5,6 @@ import { RegisterInput, LoginInput } from '../schemas/user.schema.js';
 const SALT_ROUNDS = 10;
 
 export async function register(prisma: PrismaClient, input: RegisterInput) {
-  console.log('📥 Backend recebeu input:', JSON.stringify({
     specialty: input.specialty,
     experience: input.experience,
     description: input.description,
@@ -113,7 +112,6 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
       skipDuplicates: true,
     });
 
-    console.log(`✅ Criados ${categoryIds.length} categorias e ${input.services.length} subcategorias para o profissional`);
   }
 
   // Remover senha do retorno

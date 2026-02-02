@@ -580,14 +580,11 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         }));
       });
 
-      console.log('Dados a serem salvos:', customAvailabilityData.length, 'registros');
-      console.log('Primeiro registro:', customAvailabilityData[0]);
 
       if (customAvailabilityData.length > 0) {
         const result = await fastify.prisma.customAvailability.createMany({
           data: customAvailabilityData,
         });
-        console.log('Registros inseridos:', result.count);
       }
 
       // Verificar se realmente salvou
@@ -595,7 +592,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         where: { professionalId },
         orderBy: [{ date: 'asc' }, { timeSlot: 'asc' }],
       });
-      console.log('Registros salvos no banco:', saved.length);
 
       return {
         message: 'Custom availability updated successfully',

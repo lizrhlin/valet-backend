@@ -26,7 +26,6 @@ async function createViews() {
     `);
 
   } catch (error) {
-    console.error('❌ Erro:', error);
   } finally {
     await prisma.$disconnect();
   }
