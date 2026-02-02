@@ -27,7 +27,7 @@ export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 export const createAppointmentSchema = z.object({
   professionalId: idSchema,
-  subcategoryId: idSchema,
+  subcategoryId: z.string().regex(/^\d+$/, 'subcategoryId deve ser um número'), // ✅ Aceitar string numérica
   addressId: idSchema,
   scheduledDate: z.string().datetime('Data inválida'),
   scheduledTime: timeSchema,
