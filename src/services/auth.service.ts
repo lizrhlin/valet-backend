@@ -5,13 +5,6 @@ import { RegisterInput, LoginInput } from '../schemas/user.schema.js';
 const SALT_ROUNDS = 10;
 
 export async function register(prisma: PrismaClient, input: RegisterInput) {
-    specialty: input.specialty,
-    experience: input.experience,
-    description: input.description,
-    userType: input.userType,
-    services: input.services,
-  }, null, 2));
-  
   // Verificar se o email já existe
   const existingUser = await prisma.user.findUnique({
     where: { email: input.email },

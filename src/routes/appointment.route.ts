@@ -62,11 +62,6 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           where: { userId },
           select: { id: true, street: true, number: true, isDefault: true },
         });
-      } else {
-          id: address.id,
-          userId: address.userId,
-          street: address.street,
-        });
       }
 
       if (!address) {
