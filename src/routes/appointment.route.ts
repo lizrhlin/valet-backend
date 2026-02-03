@@ -408,6 +408,71 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
       };
     }
   );
+
+  // Rejeitar agendamento (profissional)
+  fastify.patch<{ 
+    Params: { appointmentId: string },
+    Body: { reason?: string }
+  }>(
+    '/appointments/:appointmentId/reject',
+    {
+      schema: {
+        tags: ['appointments'],
+        description: 'Reject appointment (professional only)',
+        params: appointmentIdParamSchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user.userId;
+      const { appointmentId } = request.params;
+      const { reason } = request.body as { reason?: string };
+
+      const appointment = await fastify.prisma.appointment.findUnique({
+        where: { id: appointmentId },
+      });
+
+      if (!appointment) {
+        reply.code(404);
+        return { error: 'Appointment not found' };
+      }
+
+      if (appointment.professionalId !== userId) {
+        reply.code(403);
+        return { error: 'Only the professional can reject' };
+      }
+
+      if (appointment.status !== 'PENDING') {
+        reply.code(400);
+        return { error: 'Only pending appointments can be rejected' };
+      }
+
+      const updated = await fastify.prisma.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          status: 'REJECTED',
+          cancelledAt: new Date(),
+          notes: reason ? `Rejeitado: ${reason}` : appointment.notes,
+        },
+        include: {
+          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          subcategory: { include: { category: true } },
+          address: true,
+        },
+      });
+
+      return {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+        scheduledDate: updated.scheduledDate.toISOString(),
+        confirmedAt: updated.confirmedAt?.toISOString() || null,
+        startedAt: updated.startedAt?.toISOString() || null,
+        completedAt: updated.completedAt?.toISOString() || null,
+        cancelledAt: updated.cancelledAt?.toISOString() || null,
+      };
+    }
+  );
 };
 
 export default appointmentRoute;
