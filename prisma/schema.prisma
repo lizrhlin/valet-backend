@@ -29,12 +29,13 @@ enum UserStatus {
 }
 
 enum AppointmentStatus {
-  PENDING    // Aguardando confirmação do profissional
-  CONFIRMED  // Confirmado pelo profissional
+  PENDING     // Aguardando confirmação do profissional
+  CONFIRMED   // Confirmado pelo profissional
+  ON_WAY      // Profissional a caminho
   IN_PROGRESS // Serviço em andamento
-  COMPLETED  // Serviço finalizado
-  CANCELLED  // Cancelado
-  REJECTED   // Rejeitado pelo profissional
+  COMPLETED   // Serviço finalizado
+  CANCELLED   // Cancelado
+  REJECTED    // Rejeitado pelo profissional
 }
 
 enum PaymentMethod {

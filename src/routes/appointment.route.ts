@@ -476,6 +476,147 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Profissional está a caminho
+  fastify.patch<{ Params: { appointmentId: string } }>(
+    '/appointments/:appointmentId/on-way',
+    {
+      schema: {
+        tags: ['appointments'],
+        description: 'Mark professional as on the way',
+        params: appointmentIdParamSchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user.userId;
+      const { appointmentId } = request.params;
+
+      const appointment = await fastify.prisma.appointment.findUnique({
+        where: { id: appointmentId },
+      });
+
+      if (!appointment) {
+        reply.code(404);
+        return { error: 'Appointment not found' };
+      }
+
+      if (appointment.professionalId !== userId) {
+        reply.code(403);
+        return { error: 'Only the professional can update status' };
+      }
+
+      if (appointment.status !== 'CONFIRMED') {
+        reply.code(400);
+        return { error: 'Only confirmed appointments can be marked as on way' };
+      }
+
+      const updated = await fastify.prisma.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          status: 'ON_WAY',
+        },
+        include: {
+          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          subcategory: { include: { category: true } },
+          address: true,
+        },
+      });
+
+      return {
+        id: updated.id,
+        clientId: updated.clientId,
+        professionalId: updated.professionalId,
+        subcategoryId: updated.subcategoryId,
+        addressId: updated.addressId,
+        status: updated.status,
+        price: updated.price,
+        notes: updated.notes,
+        scheduledTime: updated.scheduledTime,
+        client: updated.client,
+        professional: updated.professional,
+        subcategory: updated.subcategory,
+        address: updated.address,
+        createdAt: updated.createdAt.toISOString(),
+        scheduledDate: updated.scheduledDate.toISOString(),
+        confirmedAt: updated.confirmedAt?.toISOString() || null,
+        startedAt: updated.startedAt?.toISOString() || null,
+        completedAt: updated.completedAt?.toISOString() || null,
+        cancelledAt: updated.cancelledAt?.toISOString() || null,
+      };
+    }
+  );
+
+  // Iniciar serviço
+  fastify.patch<{ Params: { appointmentId: string } }>(
+    '/appointments/:appointmentId/start',
+    {
+      schema: {
+        tags: ['appointments'],
+        description: 'Start service',
+        params: appointmentIdParamSchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user.userId;
+      const { appointmentId } = request.params;
+
+      const appointment = await fastify.prisma.appointment.findUnique({
+        where: { id: appointmentId },
+      });
+
+      if (!appointment) {
+        reply.code(404);
+        return { error: 'Appointment not found' };
+      }
+
+      if (appointment.professionalId !== userId) {
+        reply.code(403);
+        return { error: 'Only the professional can start service' };
+      }
+
+      if (appointment.status !== 'ON_WAY' && appointment.status !== 'CONFIRMED') {
+        reply.code(400);
+        return { error: 'Cannot start service from current status' };
+      }
+
+      const updated = await fastify.prisma.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          status: 'IN_PROGRESS',
+          startedAt: new Date(),
+        },
+        include: {
+          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          subcategory: { include: { category: true } },
+          address: true,
+        },
+      });
+
+      return {
+        id: updated.id,
+        clientId: updated.clientId,
+        professionalId: updated.professionalId,
+        subcategoryId: updated.subcategoryId,
+        addressId: updated.addressId,
+        status: updated.status,
+        price: updated.price,
+        notes: updated.notes,
+        scheduledTime: updated.scheduledTime,
+        client: updated.client,
+        professional: updated.professional,
+        subcategory: updated.subcategory,
+        address: updated.address,
+        createdAt: updated.createdAt.toISOString(),
+        scheduledDate: updated.scheduledDate.toISOString(),
+        confirmedAt: updated.confirmedAt?.toISOString() || null,
+        startedAt: updated.startedAt?.toISOString() || null,
+        completedAt: updated.completedAt?.toISOString() || null,
+        cancelledAt: updated.cancelledAt?.toISOString() || null,
+      };
+    }
+  );
+
   // Rejeitar agendamento (profissional)
   fastify.patch<{ 
     Params: { appointmentId: string },
