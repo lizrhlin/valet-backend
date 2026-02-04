@@ -7,6 +7,17 @@ import {
 } from '../schemas/appointment.schema.js';
 import { authenticate } from '../utils/auth.js';
 
+// Helper para incluir dados completos do cliente
+const clientSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  avatar: true,
+  createdAt: true,
+  rating: true,
+};
+
 const appointmentRoute: FastifyPluginAsync = async (fastify) => {
   // Todas as rotas de agendamento requerem autenticação
   fastify.addHook('onRequest', authenticate);
@@ -88,16 +99,28 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           notes: data.notes,
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: clientSelect },
           subcategory: { include: { category: true } },
           address: true,
+        },
+      });
+
+      // Buscar total de appointments CONCLUÍDOS do cliente
+      const clientAppointmentsCount = await fastify.prisma.appointment.count({
+        where: { 
+          clientId: appointment.clientId,
+          status: 'COMPLETED'
         },
       });
 
       reply.code(201);
       return {
         ...appointment,
+        client: {
+          ...appointment.client,
+          totalAppointments: clientAppointmentsCount,
+        },
         createdAt: appointment.createdAt.toISOString(),
         updatedAt: appointment.updatedAt.toISOString(),
         scheduledDate: appointment.scheduledDate.toISOString(),
@@ -143,8 +166,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           take: limit,
           orderBy: { scheduledDate: 'desc' },
           include: {
-            client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-            professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+            client: { select: clientSelect },
+            professional: { select: clientSelect },
             subcategory: { include: { category: true } },
             address: true,
           },
@@ -152,9 +175,53 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         fastify.prisma.appointment.count({ where }),
       ]);
 
+      // Buscar total de appointments CONCLUÍDOS para cada cliente e profissional único
+      const clientIds = [...new Set(appointments.map(apt => apt.clientId))];
+      const professionalIds = [...new Set(appointments.map(apt => apt.professionalId))];
+      
+      const clientAppointmentsCounts = await Promise.all(
+        clientIds.map(async (clientId) => ({
+          clientId,
+          count: await fastify.prisma.appointment.count({ 
+            where: { 
+              clientId,
+              status: 'COMPLETED'
+            } 
+          }),
+        }))
+      );
+      
+      const professionalAppointmentsCounts = await Promise.all(
+        professionalIds.map(async (professionalId) => ({
+          professionalId,
+          count: await fastify.prisma.appointment.count({ 
+            where: { 
+              professionalId,
+              status: 'COMPLETED'
+            } 
+          }),
+        }))
+      );
+      
+      const clientCountsMap = Object.fromEntries(
+        clientAppointmentsCounts.map(c => [c.clientId, c.count])
+      );
+      
+      const professionalCountsMap = Object.fromEntries(
+        professionalAppointmentsCounts.map(c => [c.professionalId, c.count])
+      );
+
       return {
         data: appointments.map(apt => ({
           ...apt,
+          client: apt.client ? {
+            ...apt.client,
+            totalAppointments: clientCountsMap[apt.clientId] || 0,
+          } : null,
+          professional: apt.professional ? {
+            ...apt.professional,
+            totalAppointments: professionalCountsMap[apt.professionalId] || 0,
+          } : null,
           createdAt: apt.createdAt.toISOString(),
           updatedAt: apt.updatedAt.toISOString(),
           scheduledDate: apt.scheduledDate.toISOString(),
