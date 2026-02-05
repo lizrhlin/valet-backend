@@ -21,6 +21,7 @@ import appointmentRoute from './routes/appointment.route.js';
 import addressRoute from './routes/address.route.js';
 import favoriteRoute from './routes/favorite.route.js';
 import reviewRoute from './routes/review.route.js';
+import professionalReviewRoute from './routes/professional-review.route.js';
 import notificationRoute from './routes/notification.route.js';
 
 export async function buildApp() {
@@ -110,6 +111,7 @@ export async function buildApp() {
   await app.register(addressRoute, { prefix: '/api' });
   await app.register(favoriteRoute, { prefix: '/api' });
   await app.register(reviewRoute, { prefix: '/api' });
+  await app.register(professionalReviewRoute, { prefix: '/api' });
   await app.register(notificationRoute, { prefix: '/api' });
 
   return app;
