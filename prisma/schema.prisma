@@ -56,15 +56,8 @@ enum NotificationType {
   WARNING
   ERROR
   BOOKING    // Notificações de agendamento
-  CHAT       // Notificações de mensagens
   REVIEW     // Notificações de avaliações
   SYSTEM     // Notificações do sistema
-}
-
-enum MessageStatus {
-  SENT
-  DELIVERED
-  READ
 }
 
 enum ReviewRole {
@@ -135,7 +128,6 @@ model User {
   // Como cliente
   appointmentsAsClient Appointment[] @relation("ClientAppointments")
   favorites            Favorite[]
-  sentMessages         Message[]     @relation("SentMessages")
   
   // Como profissional
   appointmentsAsProfessional Appointment[] @relation("ProfessionalAppointments")
@@ -148,9 +140,8 @@ model User {
   reviewsGiven    Review[] @relation("ReviewsGiven")
   reviewsReceived Review[] @relation("ReviewsReceived")
   
-  // Notificações e Chat
+  // Notificações
   notifications   Notification[]
-  chatParticipants ChatParticipant[]
 
   @@map("users")
   @@unique([cpf, userType], name: "unique_cpf_usertype")
@@ -343,8 +334,6 @@ model Appointment {
 
   // Relacionamentos
   reviews  Review[]
-  messages Message[]
-  chat     Chat?
 
   @@map("appointments")
   @@index([clientId])
@@ -434,74 +423,6 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([type])
-  @@index([createdAt])
-}
-
-// ============================================
-// CHAT / MENSAGENS
-// ============================================
-
-model Chat {
-  id            String   @id @default(cuid())
-  
-  appointmentId String?  @unique
-  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  participants ChatParticipant[]
-  messages     Message[]
-
-  @@map("chats")
-  @@index([appointmentId])
-}
-
-model ChatParticipant {
-  id     String @id @default(cuid())
-  
-  chatId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Última leitura
-  lastReadAt DateTime?
-  
-  joinedAt DateTime @default(now())
-
-  @@unique([chatId, userId])
-  @@map("chat_participants")
-  @@index([chatId])
-  @@index([userId])
-}
-
-model Message {
-  id        String        @id @default(cuid())
-  
-  chatId    String
-  chat      Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  
-  senderId  String
-  sender    User          @relation("SentMessages", fields: [senderId], references: [id])
-  
-  appointmentId String?
-  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  
-  content   String        @db.Text
-  status    MessageStatus @default(SENT)
-  
-  // Anexos (URLs)
-  attachments String[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("messages")
-  @@index([chatId])
-  @@index([senderId])
-  @@index([appointmentId])
   @@index([createdAt])
 }
 

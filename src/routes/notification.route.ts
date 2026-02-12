@@ -177,7 +177,7 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
         tags: ['notifications'],
         description: 'Mark all notifications as read',
         body: z.object({
-          type: z.enum(['INFO', 'SUCCESS', 'WARNING', 'ERROR', 'BOOKING', 'CHAT', 'REVIEW', 'SYSTEM']).optional(),
+          type: z.enum(['INFO', 'SUCCESS', 'WARNING', 'ERROR', 'BOOKING', 'REVIEW', 'SYSTEM']).optional(),
         }),
       },
     },
@@ -281,7 +281,6 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
         WARNING: 0,
         ERROR: 0,
         BOOKING: 0,
-        CHAT: 0,
         REVIEW: 0,
         SYSTEM: 0,
       };
