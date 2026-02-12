@@ -16,6 +16,18 @@ const clientSelect = {
   avatar: true,
   createdAt: true,
   rating: true,
+  reviewCount: true,
+};
+
+// Helper para incluir dados completos do profissional
+const professionalSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  avatar: true,
+  rating: true,
+  reviewCount: true,
 };
 
 const appointmentRoute: FastifyPluginAsync = async (fastify) => {
@@ -255,8 +267,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
       const appointment = await fastify.prisma.appointment.findUnique({
         where: { id: appointmentId },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -330,8 +342,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           cancelledAt: new Date(),
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -390,8 +402,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           confirmedAt: new Date(),
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -450,8 +462,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           completedAt: new Date(),
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -515,8 +527,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           status: 'ON_WAY',
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -586,8 +598,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           startedAt: new Date(),
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -662,8 +674,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           notes: reason ? `Rejeitado: ${reason}` : appointment.notes,
         },
         include: {
-          client: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
-          professional: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
+          client: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
