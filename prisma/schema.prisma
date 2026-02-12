@@ -67,6 +67,11 @@ enum MessageStatus {
   READ
 }
 
+enum ReviewRole {
+  CLIENT
+  PROFESSIONAL
+}
+
 // ============================================
 // USUÁRIOS
 // ============================================
@@ -129,19 +134,19 @@ model User {
   
   // Como cliente
   appointmentsAsClient Appointment[] @relation("ClientAppointments")
-  reviewsAsClient      Review[]      @relation("ClientReviews")
-  reviewsReceivedAsClient ProfessionalReview[] @relation("ClientReceivedReviews")
   favorites            Favorite[]
   sentMessages         Message[]     @relation("SentMessages")
   
   // Como profissional
   appointmentsAsProfessional Appointment[] @relation("ProfessionalAppointments")
-  reviewsAsProfessional      Review[]      @relation("ProfessionalReviews")
-  reviewsGivenAsProfessional ProfessionalReview[] @relation("ProfessionalGivenReviews")
   categories                 ProfessionalCategory[] @relation("ProfessionalCategories")
   subcategories              ProfessionalSubcategory[] @relation("ProfessionalSubcategories")
   availability               Availability[]
   customAvailability         CustomAvailability[] @relation("CustomAvailability")
+  
+  // Reviews (unificado)
+  reviewsGiven    Review[] @relation("ReviewsGiven")
+  reviewsReceived Review[] @relation("ReviewsReceived")
   
   // Notificações e Chat
   notifications   Notification[]
@@ -337,8 +342,7 @@ model Appointment {
   updatedAt DateTime @updatedAt
 
   // Relacionamentos
-  review   Review?
-  professionalReview ProfessionalReview? @relation("ProfessionalReviewAppointment")
+  reviews  Review[]
   messages Message[]
   chat     Chat?
 
@@ -356,61 +360,33 @@ model Appointment {
 // ============================================
 
 model Review {
-  id             String  @id @default(cuid())
+  id             String      @id @default(cuid())
   
-  appointmentId  String  @unique
+  // Relacionamento com agendamento
+  appointmentId  String
   appointment    Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   
-  clientId       String
-  client         User    @relation("ClientReviews", fields: [clientId], references: [id])
+  // Quem avaliou (FROM)
+  fromUserId     String
+  fromUser       User        @relation("ReviewsGiven", fields: [fromUserId], references: [id])
+  roleFrom       ReviewRole  // CLIENT ou PROFESSIONAL
   
-  professionalId String
-  professional   User    @relation("ProfessionalReviews", fields: [professionalId], references: [id])
+  // Quem foi avaliado (TO)
+  toUserId       String
+  toUser         User        @relation("ReviewsReceived", fields: [toUserId], references: [id])
+  roleTo         ReviewRole  // CLIENT ou PROFESSIONAL
   
-  rating  Int     // 1-5 estrelas
-  comment String? @db.Text
+  // Avaliação
+  rating         Int         // 1-5 estrelas
+  comment        String?     @db.Text
   
-  // Avaliações específicas
-  punctuality    Int? // 1-5
-  quality        Int? // 1-5
-  communication  Int? // 1-5
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@map("reviews")
-  @@index([professionalId])
-  @@index([clientId])
-  @@index([rating])
-}
-
-// Avaliações que o profissional faz do cliente
-model ProfessionalReview {
-  id             String  @id @default(cuid())
-  
-  appointmentId  String  @unique
-  appointment    Appointment @relation("ProfessionalReviewAppointment", fields: [appointmentId], references: [id], onDelete: Cascade)
-  
-  professionalId String
-  professional   User    @relation("ProfessionalGivenReviews", fields: [professionalId], references: [id])
-  
-  clientId       String
-  client         User    @relation("ClientReceivedReviews", fields: [clientId], references: [id])
-  
-  rating  Int     // 1-5 estrelas
-  comment String? @db.Text
-  
-  // Avaliações específicas do cliente
-  punctuality    Int? // 1-5 (chegou no horário?)
-  respectful     Int? // 1-5 (foi educado e respeitoso?)
-  payment        Int? // 1-5 (pagamento sem problemas?)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("professional_reviews")
-  @@index([clientId])
-  @@index([professionalId])
+  @@unique([appointmentId, fromUserId]) // Cada user avalia o appointment 1x
+  @@index([toUserId])
+  @@index([fromUserId])
   @@index([rating])
 }
 
