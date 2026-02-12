@@ -218,6 +218,61 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Verificar se um appointment já foi avaliado pelo cliente
+  fastify.get<{ Params: { appointmentId: string } }>(
+    '/reviews/appointment/:appointmentId',
+    {
+      schema: {
+        tags: ['reviews'],
+        description: 'Check if an appointment has been reviewed by the client',
+        params: z.object({
+          appointmentId: z.string(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { appointmentId } = request.params;
+
+      const review = await fastify.prisma.review.findUnique({
+        where: { appointmentId },
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+          appointment: {
+            select: {
+              id: true,
+              subcategory: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!review) {
+        reply.code(404);
+        return { reviewed: false };
+      }
+
+      return {
+        reviewed: true,
+        review: {
+          ...review,
+          createdAt: review.createdAt.toISOString(),
+          updatedAt: review.updatedAt.toISOString(),
+        },
+      };
+    }
+  );
+
   // Listar avaliações de um profissional
   fastify.get<{ Params: { professionalId: string } }>(
     '/reviews/professional/:professionalId',
