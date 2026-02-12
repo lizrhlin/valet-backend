@@ -457,22 +457,11 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      // Incrementar contador do profissional (opcional - pode não existir registro)
-      try {
-        const professionalRecord = await fastify.prisma.professional.findUnique({
-          where: { userId: appointment.professionalId },
-        });
-        
-        if (professionalRecord) {
-          await fastify.prisma.professional.update({
-            where: { userId: appointment.professionalId },
-            data: { servicesCompleted: { increment: 1 } },
-          });
-        }
-      } catch (error) {
-        // Ignorar erro se tabela professional não existir ou não houver registro
-        fastify.log.warn('Could not update professional servicesCompleted counter');
-      }
+      // Incrementar contador de serviços completados do profissional
+      await fastify.prisma.user.update({
+        where: { id: appointment.professionalId },
+        data: { servicesCompleted: { increment: 1 } },
+      });
 
       return {
         ...updated,
