@@ -7,25 +7,24 @@ import {
   clientReviewsParamSchema,
 } from '../schemas/professional-review.schema.js';
 import { authenticate } from '../utils/auth.js';
-import { FastifyInstance } from 'fastify';
-
-// Função auxiliar para recalcular rating do cliente
-async function recalculateClientRating(fastify: FastifyInstance, clientId: string) {
-  const reviews = await fastify.prisma.professionalReview.findMany({
-    where: { clientId },
-  });
-
-  if (reviews.length === 0) {
-    return;
-  }
-
-  const avgRating = reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length;
-
-  // Nota: Atualmente não há campo de rating para clientes no User
-  // Você pode adicionar se necessário
-}
 
 const professionalReviewRoute: FastifyPluginAsync = async (fastify) => {
+  // Função auxiliar para recalcular rating do cliente
+  async function recalculateClientRating(clientId: string) {
+    const reviews = await fastify.prisma.professionalReview.findMany({
+      where: { clientId },
+    });
+
+    if (reviews.length === 0) {
+      return;
+    }
+
+    const avgRating = reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length;
+
+    // Nota: Atualmente não há campo de rating para clientes no User
+    // Você pode adicionar se necessário
+  }
+
   // Todas as rotas requerem autenticação
   fastify.addHook('onRequest', authenticate);
 
@@ -110,7 +109,7 @@ const professionalReviewRoute: FastifyPluginAsync = async (fastify) => {
       });
 
       // Recalcular rating médio do cliente
-      await recalculateClientRating(fastify, appointment.clientId);
+      await recalculateClientRating(appointment.clientId);
 
       reply.code(201);
       return {

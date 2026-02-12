@@ -249,13 +249,13 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Verificar se um appointment já foi avaliado pelo cliente
+  // Verificar se um appointment já foi avaliado pelo usuário logado
   fastify.get<{ Params: { appointmentId: string } }>(
     '/reviews/appointment/:appointmentId',
     {
       schema: {
         tags: ['reviews'],
-        description: 'Check if an appointment has been reviewed by the client',
+        description: 'Check if an appointment has been reviewed by the logged user',
         params: z.object({
           appointmentId: z.string(),
         }),
@@ -263,11 +263,24 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { appointmentId } = request.params;
+      const userId = request.user.userId;
 
       const review = await fastify.prisma.review.findUnique({
-        where: { appointmentId },
+        where: { 
+          appointmentId_fromUserId: {
+            appointmentId,
+            fromUserId: userId,
+          }
+        },
         include: {
-          client: {
+          fromUser: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+          toUser: {
             select: {
               id: true,
               name: true,
@@ -326,7 +339,10 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
 
       const [reviews, total] = await Promise.all([
         fastify.prisma.review.findMany({
-          where: { professionalId },
+          where: { 
+            toUserId: professionalId,
+            roleTo: 'PROFESSIONAL'
+          },
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
@@ -351,7 +367,12 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
             },
           },
         }),
-        fastify.prisma.review.count({ where: { toUserId: userId } }),
+        fastify.prisma.review.count({ 
+          where: { 
+            toUserId: professionalId,
+            roleTo: 'PROFESSIONAL'
+          } 
+        }),
       ]);
 
       return {
@@ -456,19 +477,19 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
         where: { id: userId },
       });
 
-      if (review.clientId !== userId && user?.userType !== 'ADMIN') {
+      if (review.fromUserId !== userId && user?.userType !== 'ADMIN') {
         reply.code(403);
         return { error: 'Only the author or admin can delete reviews' };
       }
 
-      const professionalId = review.professionalId;
+      const targetUserId = review.toUserId;
 
       await fastify.prisma.review.delete({
         where: { id: reviewId },
       });
 
       // Recalcular rating
-      await recalculateUserRating(fastify, toUserId);
+      await recalculateUserRating(fastify, targetUserId);
 
       return { message: 'Review deleted successfully' };
     }
