@@ -127,6 +127,8 @@ export const userResponseSchema = z.object({
   notificationsEnabled: z.boolean(),
   darkMode: z.boolean(),
   language: z.string(),
+  rating: z.number().default(0),
+  reviewCount: z.number().default(0),
   createdAt: z.union([z.string().datetime(), z.date()]).transform(val => 
     val instanceof Date ? val.toISOString() : val
   ),
