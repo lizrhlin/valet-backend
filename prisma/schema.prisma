@@ -74,7 +74,7 @@ model User {
   email     String     @unique
   name      String
   phone     String?
-  password  String
+  passwordHash  String  @map("password")  // Bcrypt hash da senha
   avatar    String?    // URL da foto de perfil
   userType  UserType   @default(CLIENT)
   status    UserStatus @default(PENDING_VERIFICATION)
@@ -87,8 +87,8 @@ model User {
   notificationsEnabled Boolean @default(true)
   language             String  @default("pt-BR")
 
-  // Tokens
-  refreshToken      String?
+  // Tokens (NUNCA armazenar tokens puros, apenas hashes)
+  refreshTokenHash      String?  @map("refreshToken")  // Hash SHA256 do refresh token
   resetPasswordToken String?
   resetPasswordExpires DateTime?
 

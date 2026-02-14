@@ -36,7 +36,7 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
     data: {
       email: input.email,
       name: input.name,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       phone: input.phone,
       cpf: input.cpf,
       userType: input.userType,
@@ -108,7 +108,7 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
   }
 
   // Remover senha do retorno
-  const { password: _, ...userWithoutPassword } = user;
+  const { passwordHash: _, ...userWithoutPassword } = user;
 
   return {
     user: userWithoutPassword,
@@ -126,14 +126,14 @@ export async function login(prisma: PrismaClient, input: LoginInput) {
   }
 
   // Verificar senha
-  const isValid = await bcrypt.compare(input.password, user.password);
+  const isValid = await bcrypt.compare(input.password, user.passwordHash);
 
   if (!isValid) {
     throw new Error('Credenciais inválidas');
   }
 
   // Remover senha do retorno
-  const { password: _, ...userWithoutPassword } = user;
+  const { passwordHash: _pwd, ...userWithoutPassword } = user;
 
   return {
     user: userWithoutPassword,

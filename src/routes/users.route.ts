@@ -37,7 +37,7 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
       }
 
       // Remove password from response
-      const { password, refreshToken, resetPasswordToken, resetPasswordExpires, ...userWithoutSensitiveData } = user;
+      const { passwordHash, refreshTokenHash, resetPasswordToken, resetPasswordExpires, ...userWithoutSensitiveData } = user;
       
       return {
         ...userWithoutSensitiveData,
@@ -80,7 +80,7 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
         });
 
         // Remove password from response
-        const { password, refreshToken, resetPasswordToken, resetPasswordExpires, ...userWithoutSensitiveData } = updatedUser;
+        const { passwordHash, refreshTokenHash, resetPasswordToken, resetPasswordExpires, ...userWithoutSensitiveData } = updatedUser;
         
         return {
           ...userWithoutSensitiveData,

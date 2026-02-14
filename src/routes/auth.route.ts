@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { registerSchema, loginSchema, authResponseSchema, RegisterInput, LoginInput } from '../schemas/user.schema.js';
 import { register, login } from '../services/auth.service.js';
+import { hashRefreshToken, verifyRefreshTokenHash } from '../utils/auth.js';
 
 const authRoute: FastifyPluginAsync = async (fastify) => {
   // Registro
@@ -28,10 +29,11 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         const accessToken = fastify.jwt.sign({ userId: result.user.id });
         const refreshToken = fastify.jwt.sign({ userId: result.user.id }, { expiresIn: '30d' });
 
-        // Salvar refresh token
+        // Salvar HASH do refresh token (nunca o token puro)
+        const refreshTokenHash = hashRefreshToken(refreshToken);
         await fastify.prisma.user.update({
           where: { id: result.user.id },
-          data: { refreshToken },
+          data: { refreshTokenHash },
         });
 
         reply.code(201);
@@ -67,10 +69,11 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         const accessToken = fastify.jwt.sign({ userId: result.user.id });
         const refreshToken = fastify.jwt.sign({ userId: result.user.id }, { expiresIn: '30d' });
 
-        // Salvar refresh token
+        // Salvar HASH do refresh token (nunca o token puro)
+        const refreshTokenHash = hashRefreshToken(refreshToken);
         await fastify.prisma.user.update({
           where: { id: result.user.id },
-          data: { refreshToken },
+          data: { refreshTokenHash },
         });
 
         return { ...result, accessToken, refreshToken, expiresIn: 604800 }; // 7 dias em segundos
@@ -106,7 +109,7 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       try {
-        // Verificar refresh token
+        // Verificar refresh token JWT
         const decoded = fastify.jwt.verify<{ userId: string }>(request.body.refreshToken);
         
         // Buscar usuário
@@ -114,7 +117,8 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           where: { id: decoded.userId },
         });
 
-        if (!user || user.refreshToken !== request.body.refreshToken) {
+        // Verificar se o hash do token corresponde ao armazenado
+        if (!user || !user.refreshTokenHash || !verifyRefreshTokenHash(request.body.refreshToken, user.refreshTokenHash)) {
           reply.code(401);
           return { error: 'Invalid refresh token' };
         }
@@ -123,10 +127,11 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         const accessToken = fastify.jwt.sign({ userId: user.id });
         const newRefreshToken = fastify.jwt.sign({ userId: user.id }, { expiresIn: '30d' });
 
-        // Atualizar refresh token no banco
+        // Atualizar HASH do refresh token no banco
+        const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
         await fastify.prisma.user.update({
           where: { id: user.id },
-          data: { refreshToken: newRefreshToken },
+          data: { refreshTokenHash: newRefreshTokenHash },
         });
 
         return { accessToken, refreshToken: newRefreshToken };
@@ -160,10 +165,10 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         await request.jwtVerify();
         const userId = request.user.userId;
 
-        // Remover refresh token
+        // Remover hash do refresh token
         await fastify.prisma.user.update({
           where: { id: userId },
-          data: { refreshToken: null },
+          data: { refreshTokenHash: null },
         });
 
         return { message: 'Logged out successfully' };
