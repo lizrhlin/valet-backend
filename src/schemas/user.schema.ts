@@ -57,16 +57,26 @@ export const registerSchema = z.object({
   }
   return true;
 }, {
-  message: 'Avatar é obrigatório para profissionais',
+  message: 'Foto de perfil é obrigatória para profissionais',
   path: ['avatar'],
 }).refine((data) => {
-  // Se for profissional, deve ter 2 documentos
-  if (data.userType === 'PROFESSIONAL' && (!data.documents || data.documents.length < 2)) {
-    return false;
+  // Se for profissional, deve ter exatamente 2 documentos
+  if (data.userType === 'PROFESSIONAL') {
+    if (!data.documents || data.documents.length < 2) {
+      return false;
+    }
+    // Verificar se tem os 2 tipos obrigatórios
+    const types = data.documents.map(doc => doc.type);
+    const hasSelfie = types.includes('SELFIE_WITH_DOCUMENT');
+    const hasIdDoc = types.includes('ID_DOCUMENT');
+    
+    if (!hasSelfie || !hasIdDoc) {
+      return false;
+    }
   }
   return true;
 }, {
-  message: 'Dois documentos são obrigatórios para profissionais',
+  message: 'Envio de documentos é obrigatório para profissionais (selfie com documento e foto do documento)',
   path: ['documents'],
 });
 

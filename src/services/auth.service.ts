@@ -30,11 +30,23 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
 
   // Validações para profissionais
   if (input.userType === 'PROFESSIONAL') {
+    // Validar avatar
     if (!input.avatar) {
-      throw new Error('Avatar é obrigatório para profissionais');
+      throw new Error('Foto de perfil é obrigatória para profissionais');
     }
+    
+    // Validar documentos
     if (!input.documents || input.documents.length < 2) {
-      throw new Error('Dois documentos são obrigatórios para profissionais');
+      throw new Error('Envio de documentos é obrigatório para profissionais (selfie com documento e foto do documento)');
+    }
+    
+    // Verificar se tem os 2 tipos obrigatórios
+    const types = input.documents.map(doc => doc.type);
+    const hasSelfie = types.includes('SELFIE_WITH_DOCUMENT');
+    const hasIdDoc = types.includes('ID_DOCUMENT');
+    
+    if (!hasSelfie || !hasIdDoc) {
+      throw new Error('Envio de documentos é obrigatório para profissionais (selfie com documento e foto do documento)');
     }
   }
 
