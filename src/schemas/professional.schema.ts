@@ -34,28 +34,6 @@ export const updateProfessionalServiceSchema = z.object({
 });
 
 // ============================================
-// DISPONIBILIDADE
-// ============================================
-
-const availabilityBaseSchema = z.object({
-  dayOfWeek: z.number().int().min(0).max(6, 'Dia da semana deve estar entre 0 (domingo) e 6 (sábado)'),
-  startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, 'Horário inválido (use HH:MM)'),
-  endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, 'Horário inválido (use HH:MM)'),
-});
-
-export const addAvailabilitySchema = availabilityBaseSchema.refine(
-  (data) => data.startTime < data.endTime,
-  {
-    message: 'Horário de início deve ser anterior ao horário de término',
-    path: ['endTime'],
-  }
-);
-
-export const updateAvailabilitySchema = availabilityBaseSchema.partial().extend({
-  isActive: z.boolean().optional(),
-});
-
-// ============================================
 // BUSCAR PROFISSIONAIS
 // ============================================
 
@@ -79,10 +57,6 @@ export const searchProfessionalsSchema = z.object({
 
 export const professionalIdParamSchema = z.object({
   professionalId: idSchema,
-});
-
-export const availabilityIdParamSchema = z.object({
-  availabilityId: idSchema,
 });
 
 // ============================================
@@ -128,17 +102,6 @@ export const professionalResponseSchema = z.object({
   subcategories: z.array(professionalSubcategoryResponseSchema).optional(),
 });
 
-export const availabilityResponseSchema = z.object({
-  id: idSchema,
-  professionalId: idSchema,
-  dayOfWeek: z.number(),
-  startTime: z.string(),
-  endTime: z.string(),
-  isActive: z.boolean(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-});
-
 // ============================================
 // TYPES
 // ============================================
@@ -147,8 +110,5 @@ export type CreateProfessionalProfileInput = z.infer<typeof createProfessionalPr
 export type UpdateProfessionalProfileInput = z.infer<typeof updateProfessionalProfileSchema>;
 export type AddServiceToProfessionalInput = z.infer<typeof addServiceToProfessionalSchema>;
 export type UpdateProfessionalServiceInput = z.infer<typeof updateProfessionalServiceSchema>;
-export type AddAvailabilityInput = z.infer<typeof addAvailabilitySchema>;
-export type UpdateAvailabilityInput = z.infer<typeof updateAvailabilitySchema>;
 export type SearchProfessionalsInput = z.infer<typeof searchProfessionalsSchema>;
 export type ProfessionalResponse = z.infer<typeof professionalResponseSchema>;
-export type AvailabilityResponse = z.infer<typeof availabilityResponseSchema>;

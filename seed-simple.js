@@ -16,7 +16,6 @@ async function main() {
     await prisma.review.deleteMany();
     await prisma.appointment.deleteMany();
     await prisma.customAvailability.deleteMany();
-    await prisma.availability.deleteMany();
     await prisma.professionalSubcategory.deleteMany();
     await prisma.professionalCategory.deleteMany();
     await prisma.subcategory.deleteMany();

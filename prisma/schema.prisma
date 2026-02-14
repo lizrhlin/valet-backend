@@ -125,7 +125,6 @@ model User {
   appointmentsAsProfessional Appointment[] @relation("ProfessionalAppointments")
   categories                 ProfessionalCategory[] @relation("ProfessionalCategories")
   subcategories              ProfessionalSubcategory[] @relation("ProfessionalSubcategories")
-  availability               Availability[]
   customAvailability         CustomAvailability[] @relation("CustomAvailability")
   favoritedBy                Favorite[] @relation("FavoritesProfessional")
   
@@ -424,30 +423,7 @@ model Notification {
 // DISPONIBILIDADE DO PROFISSIONAL
 // ============================================
 
-model Availability {
-  id             String @id @default(cuid())
-  professionalId String @map("professional_id")
-  professional   User   @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  
-  // Dia da semana (0 = Domingo, 6 = Sábado)
-  dayOfWeek Int
-  
-  // Horários disponíveis
-  startTime String // Ex: "08:00"
-  endTime   String // Ex: "18:00"
-  
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("availability")
-  @@index([professionalId])
-  @@index([dayOfWeek])
-  @@index([isActive])
-}
-
-// Disponibilidade específica por data (sobrescreve a disponibilidade semanal)
+// Disponibilidade específica por data (horários do profissional no MVP)
 model CustomAvailability {
   id             String @id @default(cuid())
   professionalId String @map("professional_id")
