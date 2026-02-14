@@ -314,13 +314,13 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
               },
             },
             update: {
-              price: priceFloat,
+              priceCents: priceFloat,
               isActive: true,
             },
             create: {
               professionalId: userId,
               subcategoryId: service.subcategoryId,
-              price: priceFloat,
+              priceCents: priceFloat,
               isActive: true,
             },
           });

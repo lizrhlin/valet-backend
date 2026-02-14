@@ -225,10 +225,6 @@ model Subcategory {
   slug        String   @unique
   description String?  @db.Text
   
-  // Preços sugeridos em centavos (podem variar por profissional)
-  suggestedMinPriceCents Int?  @map("suggested_min_price_cents")
-  suggestedMaxPriceCents Int?  @map("suggested_max_price_cents")
-  
   // Tempo estimado em minutos
   estimatedDuration Int?
   
