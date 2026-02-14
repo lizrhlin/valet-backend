@@ -81,12 +81,10 @@ model User {
   
   // Documentos para verificação
   cpf              String?
-  rg               String?
   verificationDocs String[] // URLs dos documentos
 
   // Preferências
   notificationsEnabled Boolean @default(true)
-  darkMode             Boolean @default(false)
   language             String  @default("pt-BR")
 
   // Tokens
@@ -112,12 +110,6 @@ model User {
   // Avaliações (calculados)
   rating       Float @default(0)
   reviewCount  Int   @default(0) @map("review_count")
-  
-  // Tempo de resposta médio (em minutos)
-  avgResponseTime Int? @map("avg_response_time")
-  
-  // Última vez online
-  lastSeen DateTime? @map("last_seen")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

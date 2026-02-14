@@ -91,8 +91,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           longitude: true,
           rating: true,
           reviewCount: true,
-          avgResponseTime: true,
-          lastSeen: true,
           createdAt: true,
           updatedAt: true,
           subcategories: {
@@ -119,7 +117,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           ...prof,
           createdAt: prof.createdAt.toISOString(),
           updatedAt: prof.updatedAt.toISOString(),
-          lastSeen: prof.lastSeen?.toISOString(),
         })),
         total,
         page,
@@ -165,8 +162,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           longitude: true,
           rating: true,
           reviewCount: true,
-          avgResponseTime: true,
-          lastSeen: true,
           createdAt: true,
           updatedAt: true,
           userType: true,
@@ -195,7 +190,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         ...professional,
         createdAt: professional.createdAt.toISOString(),
         updatedAt: professional.updatedAt.toISOString(),
-        lastSeen: professional.lastSeen?.toISOString(),
       };
     }
   );

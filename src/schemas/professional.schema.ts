@@ -116,8 +116,6 @@ export const professionalResponseSchema = z.object({
   longitude: z.number().optional(),
   rating: z.number(),
   reviewCount: z.number(),
-  avgResponseTime: z.number().optional(),
-  lastSeen: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   user: z.object({

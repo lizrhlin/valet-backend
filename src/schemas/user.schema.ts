@@ -80,7 +80,6 @@ export const updateProfileSchema = z.object({
 
 export const updatePreferencesSchema = z.object({
   notificationsEnabled: z.boolean().optional(),
-  darkMode: z.boolean().optional(),
   language: z.string().optional(),
 });
 
@@ -108,7 +107,6 @@ export const resetPasswordSchema = z.object({
 
 export const uploadVerificationDocsSchema = z.object({
   cpf: cpfSchema,
-  rg: z.string().optional(),
   verificationDocs: z.array(z.string().url()).min(1, 'Ao menos um documento é necessário'),
 });
 
@@ -125,7 +123,6 @@ export const userResponseSchema = z.object({
   userType: userTypeSchema,
   status: userStatusSchema,
   notificationsEnabled: z.boolean(),
-  darkMode: z.boolean(),
   language: z.string(),
   rating: z.number().default(0),
   reviewCount: z.number().default(0),
