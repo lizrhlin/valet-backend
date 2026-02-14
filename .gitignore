@@ -9,6 +9,9 @@ dist/
 .env.local
 .env.*.local
 
+# Uploads (local file storage)
+uploads/
+
 # Logs
 logs
 *.log

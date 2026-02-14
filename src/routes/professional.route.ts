@@ -163,6 +163,19 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           createdAt: true,
           updatedAt: true,
           userType: true,
+          documents: {
+            select: {
+              id: true,
+              type: true,
+              url: true,
+              status: true,
+              rejectionReason: true,
+              reviewedAt: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
           professionalProfile: {
             include: {
               primaryCategory: { select: { id: true, name: true } },

@@ -28,100 +28,124 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
     }
   }
 
+  // Validações para profissionais
+  if (input.userType === 'PROFESSIONAL') {
+    if (!input.avatar) {
+      throw new Error('Avatar é obrigatório para profissionais');
+    }
+    if (!input.documents || input.documents.length < 2) {
+      throw new Error('Dois documentos são obrigatórios para profissionais');
+    }
+  }
+
   // Hash da senha
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-  // Criar usuário
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      name: input.name,
-      passwordHash: hashedPassword,
-      phone: input.phone,
-      cpf: input.cpf,
-      userType: input.userType,
-      // Criar endereço se fornecido
-      ...(input.address && input.address.city && {
-        addresses: {
-          create: {
-            street: input.address.street || '',
-            number: input.address.number || '',
-            complement: input.address.complement,
-            neighborhood: input.address.neighborhood || '',
-            city: input.address.city,
-            state: input.address.state || '',
-            zipCode: input.address.zipCode || '',
-            isDefault: true,
-          },
-        },
-      }),
-    },
-  });
-
-  // Criar perfil profissional (1:1)
-  if (input.userType === 'PROFESSIONAL') {
-    let primaryCategoryId = input.primaryCategoryId;
-
-    if (!primaryCategoryId && input.specialty) {
-      const category = await prisma.category.findFirst({
-        where: { name: { equals: input.specialty, mode: 'insensitive' } },
-        select: { id: true },
-      });
-      primaryCategoryId = category?.id;
-    }
-
-    const experienceRange = input.experienceRange || input.experience || null;
-
-    await prisma.professionalProfile.create({
+  // Usar transação para garantir consistência
+  const user = await prisma.$transaction(async (tx) => {
+    // Criar usuário
+    const newUser = await tx.user.create({
       data: {
-        userId: user.id,
-        primaryCategoryId,
-        experienceRange,
-        description: input.description || null,
-        isAvailable: false,
-        isVerified: false,
+        email: input.email,
+        name: input.name,
+        passwordHash: hashedPassword,
+        phone: input.phone,
+        avatar: input.avatar,
+        cpf: input.cpf,
+        userType: input.userType,
+        // Ativar profissionais que completam o signup com todos os dados
+        status: input.userType === 'PROFESSIONAL' ? 'ACTIVE' : 'PENDING_VERIFICATION',
+        // Criar endereço se fornecido
+        ...(input.address && input.address.city && {
+          addresses: {
+            create: {
+              street: input.address.street || '',
+              number: input.address.number || '',
+              complement: input.address.complement,
+              neighborhood: input.address.neighborhood || '',
+              city: input.address.city,
+              state: input.address.state || '',
+              zipCode: input.address.zipCode || '',
+              isDefault: true,
+            },
+          },
+        }),
       },
     });
-  }
 
-  // Se for profissional e tiver serviços, criar relacionamentos
-  if (input.userType === 'PROFESSIONAL' && input.services && input.services.length > 0) {
-    // Buscar as subcategorias para pegar os categoryIds
-    const subcategoryIds = input.services.map(s => s.subcategoryId);
-    const subcategories = await prisma.subcategory.findMany({
-      where: { id: { in: subcategoryIds } },
-      select: { id: true, categoryId: true }
-    });
+    // Criar perfil profissional (1:1)
+    if (input.userType === 'PROFESSIONAL') {
+      let primaryCategoryId = input.primaryCategoryId;
 
-    // Criar mapa de subcategoryId -> categoryId
-    const subcategoryToCategoryMap = new Map(
-      subcategories.map(sub => [sub.id, sub.categoryId])
-    );
+      if (!primaryCategoryId && input.specialty) {
+        const category = await tx.category.findFirst({
+          where: { name: { equals: input.specialty, mode: 'insensitive' } },
+          select: { id: true },
+        });
+        primaryCategoryId = category?.id;
+      }
 
-    // Coletar categoryIds únicos
-    const categoryIds = [...new Set(subcategories.map(sub => sub.categoryId))];
+      const experienceRange = input.experienceRange || input.experience || null;
 
-    // Criar ProfessionalCategory para cada categoria única
-    await prisma.professionalCategory.createMany({
-      data: categoryIds.map(categoryId => ({
-        professionalId: user.id,
-        categoryId: categoryId,
-      })),
-      skipDuplicates: true,
-    });
+      await tx.professionalProfile.create({
+        data: {
+          userId: newUser.id,
+          primaryCategoryId,
+          experienceRange,
+          description: input.description || null,
+          isAvailable: false,
+          isVerified: false,
+        },
+      });
 
-    // Criar ProfessionalSubcategory para cada serviço
-    await prisma.professionalSubcategory.createMany({
-      data: input.services.map(service => ({
-        professionalId: user.id,
-        subcategoryId: service.subcategoryId,
-        price: parseFloat(service.price.replace(',', '.')) || 0,
-        isActive: true,
-      })),
-      skipDuplicates: true,
-    });
+      // Criar documentos
+      if (input.documents && input.documents.length > 0) {
+        await tx.userDocument.createMany({
+          data: input.documents.map(doc => ({
+            userId: newUser.id,
+            type: doc.type as 'SELFIE_WITH_DOCUMENT' | 'ID_DOCUMENT',
+            url: doc.url,
+            status: 'PENDING',
+          })),
+        });
+      }
+    }
 
-  }
+    // Se for profissional e tiver serviços, criar relacionamentos
+    if (input.userType === 'PROFESSIONAL' && input.services && input.services.length > 0) {
+      // Buscar as subcategorias para pegar os categoryIds
+      const subcategoryIds = input.services.map(s => s.subcategoryId);
+      const subcategories = await tx.subcategory.findMany({
+        where: { id: { in: subcategoryIds } },
+        select: { id: true, categoryId: true }
+      });
+
+      // Coletar categoryIds únicos
+      const categoryIds = [...new Set(subcategories.map(sub => sub.categoryId))];
+
+      // Criar ProfessionalCategory para cada categoria única
+      await tx.professionalCategory.createMany({
+        data: categoryIds.map(categoryId => ({
+          professionalId: newUser.id,
+          categoryId: categoryId,
+        })),
+        skipDuplicates: true,
+      });
+
+      // Criar ProfessionalSubcategory para cada serviço
+      await tx.professionalSubcategory.createMany({
+        data: input.services.map(service => ({
+          professionalId: newUser.id,
+          subcategoryId: service.subcategoryId,
+          price: parseFloat(service.price.replace(',', '.')) || 0,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return newUser;
+  });
 
   // Remover senha do retorno
   const { passwordHash: _, ...userWithoutPassword } = user;

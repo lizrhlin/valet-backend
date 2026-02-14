@@ -3,6 +3,9 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-
 import fastifyJwt from '@fastify/jwt';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyMultipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 
 // Plugins
 import envPlugin from './plugins/env.js';
@@ -23,6 +26,8 @@ import favoriteRoute from './routes/favorite.route.js';
 import reviewRoute from './routes/review.route.js';
 import professionalReviewRoute from './routes/professional-review.route.js';
 import notificationRoute from './routes/notification.route.js';
+import documentRoute from './routes/document.route.js';
+import { registerUploadRoutes } from './routes/upload.route.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -101,6 +106,20 @@ export async function buildApp() {
     },
   });
 
+  // Register multipart plugin for file uploads
+  await app.register(fastifyMultipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+  });
+
+  // Register static file serving for uploads
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  await app.register(fastifyStatic, {
+    root: uploadsDir,
+    prefix: '/uploads/',
+  });
+
   // Registrar rotas
   await app.register(healthRoute, { prefix: '/health' });
   await app.register(authRoute, { prefix: '/auth' });
@@ -113,6 +132,8 @@ export async function buildApp() {
   await app.register(reviewRoute, { prefix: '/api' });
   await app.register(professionalReviewRoute, { prefix: '/api' });
   await app.register(notificationRoute, { prefix: '/api' });
+  await app.register(documentRoute, { prefix: '/api' });
+  await app.register(registerUploadRoutes, { prefix: '/api' });
 
   return app;
 }

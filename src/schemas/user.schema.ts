@@ -22,6 +22,8 @@ export const registerSchema = z.object({
   phone: phoneSchema.optional(),
   userType: userTypeSchema.default('CLIENT'),
   cpf: cpfSchema.optional(),
+  // Avatar (obrigatório para profissionais)
+  avatar: z.string().url('URL do avatar inválida').optional(),
   // Campos para profissionais
   primaryCategoryId: z.number().int().positive().optional(),
   experienceRange: z.string().optional(),
@@ -29,6 +31,11 @@ export const registerSchema = z.object({
   // Compatibilidade legada
   specialty: z.string().optional(),
   experience: z.string().optional(),
+  // Documentos para profissionais (URLs dos uploads)
+  documents: z.array(z.object({
+    type: z.enum(['SELFIE_WITH_DOCUMENT', 'ID_DOCUMENT']),
+    url: z.string().url('URL do documento inválida'),
+  })).optional(),
   // Serviços do profissional (subcategorias com preços)
   services: z.array(z.object({
     subcategoryId: z.number().int().positive(),
@@ -43,6 +50,24 @@ export const registerSchema = z.object({
     state: z.string().optional(),
     zipCode: z.string().optional(),
   }).optional(),
+}).refine((data) => {
+  // Se for profissional, avatar é obrigatório
+  if (data.userType === 'PROFESSIONAL' && !data.avatar) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Avatar é obrigatório para profissionais',
+  path: ['avatar'],
+}).refine((data) => {
+  // Se for profissional, deve ter 2 documentos
+  if (data.userType === 'PROFESSIONAL' && (!data.documents || data.documents.length < 2)) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Dois documentos são obrigatórios para profissionais',
+  path: ['documents'],
 });
 
 // ============================================

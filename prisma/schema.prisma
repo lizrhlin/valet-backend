@@ -65,6 +65,17 @@ enum ReviewRole {
   PROFESSIONAL
 }
 
+enum DocumentType {
+  SELFIE_WITH_DOCUMENT
+  ID_DOCUMENT
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ============================================
 // USUÁRIOS
 // ============================================
@@ -80,8 +91,8 @@ model User {
   status    UserStatus @default(PENDING_VERIFICATION)
   
   // Documentos para verificação
-  cpf              String?
-  verificationDocs String[] // URLs dos documentos
+  cpf       String?
+  documents UserDocument[]
 
   // Preferências
   notificationsEnabled Boolean @default(true)
@@ -466,4 +477,30 @@ model CustomAvailability {
   @@unique([professionalId, date, timeSlot])
   @@index([professionalId])
   @@index([date])
+}
+// ============================================
+// DOCUMENTOS DO USUÁRIO
+// ============================================
+
+model UserDocument {
+  id String @id @default(cuid())
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type   DocumentType
+  url    String
+
+  status DocumentStatus @default(PENDING) @map("status")
+
+  rejectionReason String? @db.Text @map("rejection_reason")
+  reviewedAt      DateTime? @map("reviewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("user_documents")
+  @@index([userId])
+  @@index([type])
+  @@index([status])
 }

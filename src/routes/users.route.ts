@@ -29,7 +29,22 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
-        include: { professionalProfile: true },
+        include: { 
+          professionalProfile: true,
+          documents: {
+            select: {
+              id: true,
+              type: true,
+              url: true,
+              status: true,
+              rejectionReason: true,
+              reviewedAt: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
       });
 
       if (!user) {
@@ -78,7 +93,22 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
         const updatedUser = await fastify.prisma.user.update({
           where: { id: userId },
           data: request.body,
-          include: { professionalProfile: true },
+          include: { 
+            professionalProfile: true,
+            documents: {
+              select: {
+                id: true,
+                type: true,
+                url: true,
+                status: true,
+                rejectionReason: true,
+                reviewedAt: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
         });
 
         // Remove password from response
