@@ -127,7 +127,7 @@ model User {
   
   // Como cliente
   appointmentsAsClient Appointment[] @relation("ClientAppointments")
-  favorites            Favorite[]
+  favorites            Favorite[] @relation("FavoritesUser")
   
   // Como profissional
   appointmentsAsProfessional Appointment[] @relation("ProfessionalAppointments")
@@ -135,6 +135,7 @@ model User {
   subcategories              ProfessionalSubcategory[] @relation("ProfessionalSubcategories")
   availability               Availability[]
   customAvailability         CustomAvailability[] @relation("CustomAvailability")
+  favoritedBy                Favorite[] @relation("FavoritesProfessional")
   
   // Reviews (unificado)
   reviewsGiven    Review[] @relation("ReviewsGiven")
@@ -214,9 +215,9 @@ model Subcategory {
 // Relacionamento N:N entre Profissional (User) e Categoria
 model ProfessionalCategory {
   id             String   @id @default(cuid())
-  professionalId String
+  professionalId String   @map("professional_id")
   professional   User     @relation(fields: [professionalId], references: [id], onDelete: Cascade, name: "ProfessionalCategories")
-  categoryId     Int
+  categoryId     Int      @map("category_id")
   category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -230,9 +231,9 @@ model ProfessionalCategory {
 // Relacionamento N:N entre Profissional (User) e Subcategoria (com preço)
 model ProfessionalSubcategory {
   id             String      @id @default(cuid())
-  professionalId String
+  professionalId String      @map("professional_id")
   professional   User        @relation(fields: [professionalId], references: [id], onDelete: Cascade, name: "ProfessionalSubcategories")
-  subcategoryId  Int
+  subcategoryId  Int         @map("subcategory_id")
   subcategory    Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
   
   // Preço específico deste profissional para este serviço
@@ -257,7 +258,7 @@ model ProfessionalSubcategory {
 
 model Address {
   id           String  @id @default(cuid())
-  userId       String
+  userId       String  @map("user_id")
   user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   street       String
@@ -293,16 +294,16 @@ model Appointment {
   orderNumber   String            @unique // Número do pedido visível
   
   // Relacionamentos
-  clientId      String
-  client        User              @relation("ClientAppointments", fields: [clientId], references: [id])
+  clientId      String            @map("client_id")
+  client        User              @relation("ClientAppointments", fields: [clientId], references: [id], map: "fk_appointments_client")
   
-  professionalId String
-  professional   User              @relation("ProfessionalAppointments", fields: [professionalId], references: [id])
+  professionalId String           @map("professional_id")
+  professional   User             @relation("ProfessionalAppointments", fields: [professionalId], references: [id], map: "fk_appointments_professional")
   
-  subcategoryId Int
+  subcategoryId Int               @map("subcategory_id")
   subcategory   Subcategory       @relation(fields: [subcategoryId], references: [id])
   
-  addressId     String
+  addressId     String            @map("address_id")
   address       Address           @relation(fields: [addressId], references: [id])
   
   // Detalhes do agendamento
@@ -352,17 +353,17 @@ model Review {
   id             String      @id @default(cuid())
   
   // Relacionamento com agendamento
-  appointmentId  String
-  appointment    Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointmentId  String      @map("appointment_id")
+  appointment    Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade, map: "fk_reviews_appointment")
   
   // Quem avaliou (FROM)
-  fromUserId     String
-  fromUser       User        @relation("ReviewsGiven", fields: [fromUserId], references: [id])
+  fromUserId     String      @map("from_user_id")
+  fromUser       User        @relation("ReviewsGiven", fields: [fromUserId], references: [id], map: "fk_reviews_from_user")
   roleFrom       ReviewRole  // CLIENT ou PROFESSIONAL
   
   // Quem foi avaliado (TO)
-  toUserId       String
-  toUser         User        @relation("ReviewsReceived", fields: [toUserId], references: [id])
+  toUserId       String      @map("to_user_id")
+  toUser         User        @relation("ReviewsReceived", fields: [toUserId], references: [id], map: "fk_reviews_to_user")
   roleTo         ReviewRole  // CLIENT ou PROFESSIONAL
   
   // Avaliação
@@ -386,10 +387,11 @@ model Review {
 model Favorite {
   id             String @id @default(cuid())
   
-  userId         String
-  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String @map("user_id")
+  user           User   @relation("FavoritesUser", fields: [userId], references: [id], onDelete: Cascade, map: "fk_favorites_user")
   
-  professionalId String
+  professionalId String @map("professional_id")
+  professional   User   @relation("FavoritesProfessional", fields: [professionalId], references: [id], onDelete: Cascade, map: "fk_favorites_professional")
   
   createdAt DateTime @default(now())
 
@@ -405,7 +407,7 @@ model Favorite {
 
 model Notification {
   id      String           @id @default(cuid())
-  userId  String
+  userId  String           @map("user_id")
   user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   type    NotificationType
@@ -432,7 +434,7 @@ model Notification {
 
 model Availability {
   id             String @id @default(cuid())
-  professionalId String
+  professionalId String @map("professional_id")
   professional   User   @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   
   // Dia da semana (0 = Domingo, 6 = Sábado)
@@ -456,7 +458,7 @@ model Availability {
 // Disponibilidade específica por data (sobrescreve a disponibilidade semanal)
 model CustomAvailability {
   id             String @id @default(cuid())
-  professionalId String
+  professionalId String @map("professional_id")
   professional   User   @relation("CustomAvailability", fields: [professionalId], references: [id], onDelete: Cascade)
   
   // Data específica
