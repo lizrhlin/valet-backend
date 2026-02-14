@@ -76,6 +76,13 @@ enum DocumentStatus {
   REJECTED
 }
 
+enum ProfessionalOnboardingStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
 // ============================================
 // USUÁRIOS
 // ============================================
@@ -93,6 +100,10 @@ model User {
   // Documentos para verificação
   cpf       String?
   documents UserDocument[]
+
+  // Termos e compliance
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
+  termsVersion    String?   @map("terms_version")
 
   // Preferências
   notificationsEnabled Boolean @default(true)
@@ -161,6 +172,9 @@ model ProfessionalProfile {
   isVerified  Boolean @default(false) @map("is_verified")
   isAvailable Boolean @default(false) @map("is_available")
 
+  // Onboarding status
+  onboardingStatus ProfessionalOnboardingStatus @default(DRAFT) @map("onboarding_status")
+
   // Métricas (mvp)
   servicesCompleted Int   @default(0) @map("services_completed")
   ratingAvg         Float @default(0) @map("rating_avg")
@@ -211,9 +225,9 @@ model Subcategory {
   slug        String   @unique
   description String?  @db.Text
   
-  // Preços sugeridos (podem variar por profissional)
-  suggestedMinPrice Float?
-  suggestedMaxPrice Float?
+  // Preços sugeridos em centavos (podem variar por profissional)
+  suggestedMinPriceCents Int?  @map("suggested_min_price_cents")
+  suggestedMaxPriceCents Int?  @map("suggested_max_price_cents")
   
   // Tempo estimado em minutos
   estimatedDuration Int?
@@ -260,8 +274,8 @@ model ProfessionalSubcategory {
   subcategoryId  Int         @map("subcategory_id")
   subcategory    Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
   
-  // Preço específico deste profissional para este serviço
-  price       Float
+  // Preço específico deste profissional para este serviço (em centavos)
+  priceCents  Int     @map("price_cents")
   description String? // Descrição personalizada do profissional
   
   isActive Boolean @default(true)
@@ -339,10 +353,10 @@ model Appointment {
   
   status AppointmentStatus @default(PENDING)
   
-  // Valores
-  price          Float
-  paymentMethod  PaymentMethod?
-  paymentStatus  PaymentStatus  @default(PENDING)
+  // Valores (em centavos)
+  priceCents    Int             @map("price_cents")
+  paymentMethod PaymentMethod?
+  paymentStatus PaymentStatus  @default(PENDING)
   
   // Observações
   notes          String?        @db.Text

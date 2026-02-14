@@ -55,6 +55,9 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
         userType: input.userType,
         // Ativar profissionais que completam o signup com todos os dados
         status: input.userType === 'PROFESSIONAL' ? 'ACTIVE' : 'PENDING_VERIFICATION',
+        // Registrar aceite de termos
+        termsAcceptedAt: new Date(),
+        termsVersion: '2026-02',
         // Criar endereço se fornecido
         ...(input.address && input.address.city && {
           addresses: {
@@ -95,6 +98,7 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
           description: input.description || null,
           isAvailable: false,
           isVerified: false,
+          onboardingStatus: 'SUBMITTED', // Profissional completou cadastro
         },
       });
 
@@ -137,7 +141,8 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
         data: input.services.map(service => ({
           professionalId: newUser.id,
           subcategoryId: service.subcategoryId,
-          price: parseFloat(service.price.replace(',', '.')) || 0,
+          // Converter preço "150,00" para centavos: 15000
+          priceCents: Math.round(parseFloat(service.price.replace(',', '.')) * 100) || 0,
           isActive: true,
         })),
         skipDuplicates: true,

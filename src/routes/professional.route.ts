@@ -224,7 +224,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
     Body: {
       subcategories: Array<{
         subcategoryId: number;
-        price: number;
+        priceCents: number;
         isActive: boolean;
       }>;
     };
@@ -238,7 +238,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         body: z.object({
           subcategories: z.array(z.object({
             subcategoryId: z.number().int().positive(),
-            price: z.number().positive(),
+            priceCents: z.number().int().positive(),
             isActive: z.boolean().optional().default(true),
           })),
         }),
@@ -298,13 +298,13 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
             },
           },
           update: {
-            price: sub.price,
+            priceCents: sub.priceCents,
             isActive: sub.isActive ?? true,
           },
           create: {
             professionalId,
             subcategoryId: sub.subcategoryId,
-            price: sub.price,
+            priceCents: sub.priceCents,
             isActive: sub.isActive ?? true,
           },
         });
