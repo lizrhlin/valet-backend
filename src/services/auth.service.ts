@@ -31,7 +31,7 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
   // Hash da senha
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-  // Criar usuário (todos os campos agora estão na mesma tabela)
+  // Criar usuário
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -40,14 +40,6 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
       phone: input.phone,
       cpf: input.cpf,
       userType: input.userType,
-      // Campos específicos de profissionais
-      ...(input.userType === 'PROFESSIONAL' && {
-        specialty: input.specialty || 'Profissional',
-        description: input.description || 'Novo profissional cadastrado',
-        experience: input.experience || 'A definir',
-        available: true,
-        isVerified: false,
-      }),
       // Criar endereço se fornecido
       ...(input.address && input.address.city && {
         addresses: {
@@ -62,11 +54,35 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
             isDefault: true,
           },
         },
-        // Definir location baseado no endereço
-        location: `${input.address.city}, ${input.address.state}`,
       }),
     },
   });
+
+  // Criar perfil profissional (1:1)
+  if (input.userType === 'PROFESSIONAL') {
+    let primaryCategoryId = input.primaryCategoryId;
+
+    if (!primaryCategoryId && input.specialty) {
+      const category = await prisma.category.findFirst({
+        where: { name: { equals: input.specialty, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      primaryCategoryId = category?.id;
+    }
+
+    const experienceRange = input.experienceRange || input.experience || null;
+
+    await prisma.professionalProfile.create({
+      data: {
+        userId: user.id,
+        primaryCategoryId,
+        experienceRange,
+        description: input.description || null,
+        isAvailable: false,
+        isVerified: false,
+      },
+    });
+  }
 
   // Se for profissional e tiver serviços, criar relacionamentos
   if (input.userType === 'PROFESSIONAL' && input.services && input.services.length > 0) {

@@ -29,6 +29,7 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id: userId },
+        include: { professionalProfile: true },
       });
 
       if (!user) {
@@ -77,6 +78,7 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
         const updatedUser = await fastify.prisma.user.update({
           where: { id: userId },
           data: request.body,
+          include: { professionalProfile: true },
         });
 
         // Remove password from response

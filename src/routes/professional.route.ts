@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   searchProfessionalsSchema,
   professionalIdParamSchema,
-  professionalResponseSchema,
   SearchProfessionalsInput,
 } from '../schemas/professional.schema.js';
 
@@ -27,20 +26,28 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         userType: 'PROFESSIONAL', // Filtra apenas profissionais
       };
 
+      const profileFilter: any = {};
+
       // Se available for undefined, não filtrar por disponibilidade
       // (mostra todos, incluindo null que serão tratados como disponíveis)
       // Se available=true, mostrar apenas os com agenda aberta
       // Se available=false, mostrar apenas os com agenda fechada
       if (available === true) {
-        where.available = true;
+        profileFilter.isAvailable = true;
       } else if (available === false) {
-        where.available = false;
+        profileFilter.isAvailable = false;
       }
       // Se available === undefined, não adiciona nenhum filtro
       // (backend considera null como disponível por padrão)
 
       if (minRating) {
-        where.rating = { gte: minRating };
+        profileFilter.ratingAvg = { gte: minRating };
+      }
+
+      if (Object.keys(profileFilter).length > 0) {
+        where.professionalProfile = { is: profileFilter };
+      } else {
+        where.professionalProfile = { isNot: null };
       }
 
       if (subcategoryId) {
@@ -67,9 +74,9 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
 
       // Definir ordenação
       const orderBy: any = {};
-      if (sortBy === 'rating') orderBy.rating = sortOrder;
-      else if (sortBy === 'servicesCompleted') orderBy.servicesCompleted = sortOrder;
-      else orderBy.rating = 'desc'; // default
+      if (sortBy === 'rating') orderBy.professionalProfile = { ratingAvg: sortOrder };
+      else if (sortBy === 'servicesCompleted') orderBy.professionalProfile = { servicesCompleted: sortOrder };
+      else orderBy.professionalProfile = { ratingAvg: 'desc' }; // default
 
       // Buscar profissionais
       const professionals = await fastify.prisma.user.findMany({
@@ -80,19 +87,13 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           email: true,
           phone: true,
           avatar: true,
-          specialty: true,
-          description: true,
-          experience: true,
-          servicesCompleted: true,
-          available: true,
-          isVerified: true,
-          location: true,
-          latitude: true,
-          longitude: true,
-          rating: true,
-          reviewCount: true,
           createdAt: true,
           updatedAt: true,
+          professionalProfile: {
+            include: {
+              primaryCategory: { select: { id: true, name: true } },
+            },
+          },
           subcategories: {
             where: { isActive: true },
             include: {
@@ -115,6 +116,14 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       return {
         professionals: professionals.map(prof => ({
           ...prof,
+          specialty: prof.professionalProfile?.primaryCategory?.name || null,
+          experience: prof.professionalProfile?.experienceRange || null,
+          description: prof.professionalProfile?.description || null,
+          servicesCompleted: prof.professionalProfile?.servicesCompleted ?? 0,
+          available: prof.professionalProfile?.isAvailable ?? false,
+          isVerified: prof.professionalProfile?.isVerified ?? false,
+          rating: prof.professionalProfile?.ratingAvg ?? 0,
+          reviewCount: prof.professionalProfile?.reviewCount ?? 0,
           createdAt: prof.createdAt.toISOString(),
           updatedAt: prof.updatedAt.toISOString(),
         })),
@@ -151,20 +160,14 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           email: true,
           phone: true,
           avatar: true,
-          specialty: true,
-          description: true,
-          experience: true,
-          servicesCompleted: true,
-          available: true,
-          isVerified: true,
-          location: true,
-          latitude: true,
-          longitude: true,
-          rating: true,
-          reviewCount: true,
           createdAt: true,
           updatedAt: true,
           userType: true,
+          professionalProfile: {
+            include: {
+              primaryCategory: { select: { id: true, name: true } },
+            },
+          },
           subcategories: {
             where: { isActive: true },
             include: {
@@ -181,13 +184,21 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      if (!professional || professional.userType !== 'PROFESSIONAL') {
+      if (!professional || professional.userType !== 'PROFESSIONAL' || !professional.professionalProfile) {
         reply.code(404);
         return { error: 'Professional not found' };
       }
 
       return {
         ...professional,
+        specialty: professional.professionalProfile?.primaryCategory?.name || null,
+        experience: professional.professionalProfile?.experienceRange || null,
+        description: professional.professionalProfile?.description || null,
+        servicesCompleted: professional.professionalProfile?.servicesCompleted ?? 0,
+        available: professional.professionalProfile?.isAvailable ?? false,
+        isVerified: professional.professionalProfile?.isVerified ?? false,
+        rating: professional.professionalProfile?.ratingAvg ?? 0,
+        reviewCount: professional.professionalProfile?.reviewCount ?? 0,
         createdAt: professional.createdAt.toISOString(),
         updatedAt: professional.updatedAt.toISOString(),
       };
@@ -234,6 +245,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       // Verificar se profissional existe
       const professional = await fastify.prisma.user.findUnique({
         where: { id: professionalId },
+        include: { professionalProfile: true },
       });
 
       if (!professional || professional.userType !== 'PROFESSIONAL') {
@@ -324,7 +336,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         }),
       },
     },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { professionalId } = request.params;
       const { startDate, endDate } = request.query;
 
@@ -376,6 +388,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       // Verificar se profissional existe
       const professional = await fastify.prisma.user.findUnique({
         where: { id: professionalId },
+        include: { professionalProfile: true },
       });
 
       if (!professional || professional.userType !== 'PROFESSIONAL') {
@@ -452,17 +465,18 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       // Verificar se profissional existe
       const professional = await fastify.prisma.user.findUnique({
         where: { id: professionalId },
+        include: { professionalProfile: true },
       });
 
-      if (!professional || professional.userType !== 'PROFESSIONAL') {
+      if (!professional || professional.userType !== 'PROFESSIONAL' || !professional.professionalProfile) {
         reply.code(404);
         return { error: 'Professional not found' };
       }
 
-      // Atualizar status
-      await fastify.prisma.user.update({
-        where: { id: professionalId },
-        data: { available },
+      // Atualizar status no perfil profissional
+      await fastify.prisma.professionalProfile.update({
+        where: { userId: professionalId },
+        data: { isAvailable: available },
       });
 
       return {

@@ -46,14 +46,15 @@ export const favoriteResponseSchema = z.object({
   professional: z.object({
     id: idSchema,
     userId: idSchema,
-    specialty: z.string(),
-    description: z.string(),
-    experience: z.string(),
-    available: z.boolean(),
-    isVerified: z.boolean(),
-    location: z.string(),
-    rating: z.number(),
-    reviewCount: z.number(),
+    professionalProfile: z.object({
+      primaryCategoryId: z.number().nullable().optional(),
+      experienceRange: z.string().nullable().optional(),
+      description: z.string().nullable().optional(),
+      isAvailable: z.boolean(),
+      isVerified: z.boolean(),
+      ratingAvg: z.number(),
+      reviewCount: z.number(),
+    }).optional(),
     user: z.object({
       id: idSchema,
       name: z.string(),

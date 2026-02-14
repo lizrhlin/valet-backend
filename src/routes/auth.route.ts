@@ -188,14 +188,19 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         description: 'Complete professional registration with services and details',
         security: [{ bearerAuth: [] }],
         body: z.object({
-          specialty: z.string().min(3, 'Especialização deve ter no mínimo 3 caracteres'),
+          primaryCategoryId: z.number().int().positive().optional(),
+          experienceRange: z.string().min(1, 'Experiência é obrigatória'),
           description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
-          experience: z.string().min(3, 'Experiência é obrigatória'),
-          location: z.string().min(3, 'Localização é obrigatória'),
+          // Compatibilidade legada
+          specialty: z.string().optional(),
+          experience: z.string().optional(),
           services: z.array(z.object({
             subcategoryId: z.number().int().positive('ID da subcategoria inválido'),
             price: z.string().min(1, 'Preço é obrigatório'), // Formato: "150,00"
           })).min(1, 'Selecione pelo menos um serviço'),
+        }).refine((data) => data.primaryCategoryId || data.specialty, {
+          message: 'Selecione uma especialidade principal',
+          path: ['primaryCategoryId'],
         }),
         response: {
           200: z.object({
@@ -208,6 +213,9 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           401: z.object({
             error: z.string(),
           }),
+          404: z.object({
+            error: z.string(),
+          }),
         },
       },
     },
@@ -215,8 +223,15 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
       try {
         await request.jwtVerify();
         const userId = request.user.userId;
-
-        const { specialty, description, experience, location, services } = request.body;
+        const body = request.body as {
+          primaryCategoryId?: number;
+          experienceRange?: string;
+          description: string;
+          specialty?: string;
+          experience?: string;
+          services: Array<{ subcategoryId: number; price: string }>;
+        };
+        const { primaryCategoryId, experienceRange, description, specialty, experience, services } = body;
 
         // Verificar se o usuário existe e é profissional
         const user = await fastify.prisma.user.findUnique({
@@ -233,16 +248,39 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           return { error: 'User is not a professional' };
         }
 
-        // Atualizar dados do profissional
-        const updatedUser = await fastify.prisma.user.update({
-          where: { id: userId },
-          data: {
-            specialty,
+        let resolvedPrimaryCategoryId = primaryCategoryId;
+        if (!resolvedPrimaryCategoryId && specialty) {
+          const category = await fastify.prisma.category.findFirst({
+            where: { name: { equals: specialty, mode: 'insensitive' } },
+            select: { id: true },
+          });
+          resolvedPrimaryCategoryId = category?.id;
+        }
+
+        const resolvedExperienceRange = experienceRange || experience || null;
+
+        // Atualizar dados do profissional (perfil)
+        await fastify.prisma.professionalProfile.upsert({
+          where: { userId },
+          update: {
+            primaryCategoryId: resolvedPrimaryCategoryId,
+            experienceRange: resolvedExperienceRange,
             description,
-            experience,
-            location,
-            status: 'ACTIVE', // Ativar após completar registro
           },
+          create: {
+            userId,
+            primaryCategoryId: resolvedPrimaryCategoryId,
+            experienceRange: resolvedExperienceRange,
+            description,
+            isAvailable: false,
+            isVerified: false,
+          },
+        });
+
+        // Ativar usuário após completar registro
+        await fastify.prisma.user.update({
+          where: { id: userId },
+          data: { status: 'ACTIVE' },
         });
 
         // Extrair categorias únicas dos serviços
@@ -292,6 +330,7 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         const userWithServices = await fastify.prisma.user.findUnique({
           where: { id: userId },
           include: {
+            professionalProfile: true,
             categories: {
               include: {
                 category: true,
@@ -306,7 +345,7 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         });
 
         // Remover senha do retorno
-        const { password: _, ...userWithoutPassword } = userWithServices!;
+        const { passwordHash: _, refreshTokenHash, resetPasswordToken, resetPasswordExpires, ...userWithoutPassword } = userWithServices!;
 
         return {
           message: 'Professional registration completed successfully',

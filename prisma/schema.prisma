@@ -92,24 +92,8 @@ model User {
   resetPasswordToken String?
   resetPasswordExpires DateTime?
 
-  // ===== CAMPOS ESPECÍFICOS DE PROFISSIONAIS (NULL para clientes) =====
-  specialty        String?  // Especialização principal
-  description      String?  @db.Text
-  experience       String?  // Ex: "5 anos", "Iniciante"
-  servicesCompleted Int     @default(0) @map("services_completed")
-  
-  // Disponibilidade do profissional
-  available   Boolean @default(false)
-  isVerified  Boolean @default(false) @map("is_verified")
-  
-  // Localização do profissional
-  location    String?
-  latitude    Float?
-  longitude   Float?
-  
-  // Avaliações (calculados)
-  rating       Float @default(0)
-  reviewCount  Int   @default(0) @map("review_count")
+  // Perfil profissional (1:1)
+  professionalProfile ProfessionalProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -140,8 +124,45 @@ model User {
   @@index([email])
   @@index([userType])
   @@index([status])
-  @@index([location])
-  @@index([available])
+}
+
+// ============================================
+// PERFIL PROFISSIONAL
+// ============================================
+
+model ProfessionalProfile {
+  id String @id @default(cuid())
+
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // “Especialidade principal”
+  primaryCategoryId Int? @map("primary_category_id")
+  primaryCategory   Category? @relation(fields: [primaryCategoryId], references: [id], onDelete: SetNull)
+
+  // “Anos de experiência”
+  experienceRange String? @map("experience_range")
+
+  // Bio
+  description String? @db.Text
+
+  // Status do profissional
+  isVerified  Boolean @default(false) @map("is_verified")
+  isAvailable Boolean @default(false) @map("is_available")
+
+  // Métricas (mvp)
+  servicesCompleted Int   @default(0) @map("services_completed")
+  ratingAvg         Float @default(0) @map("rating_avg")
+  reviewCount       Int   @default(0) @map("review_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("professional_profiles")
+  @@index([userId])
+  @@index([primaryCategoryId])
+  @@index([isAvailable])
+  @@index([isVerified])
 }
 
 // ============================================
@@ -163,6 +184,7 @@ model Category {
 
   subcategories       Subcategory[]
   professionalCategories ProfessionalCategory[]
+  professionalProfiles ProfessionalProfile[]
 
   @@map("categories")
   @@index([slug])

@@ -498,6 +498,11 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
 
 // Função auxiliar para recalcular rating de um usuário (profissional ou cliente)
 async function recalculateUserRating(fastify: any, userId: string) {
+  const user = await fastify.prisma.user.findUnique({
+    where: { id: userId },
+    select: { userType: true },
+  });
+
   // Buscar todas as avaliações RECEBIDAS por este usuário
   const reviews = await fastify.prisma.review.findMany({
     where: { toUserId: userId },
@@ -505,26 +510,30 @@ async function recalculateUserRating(fastify: any, userId: string) {
   });
 
   if (reviews.length === 0) {
-    await fastify.prisma.user.update({
-      where: { id: userId },
-      data: {
-        rating: 0,
-        reviewCount: 0,
-      },
-    });
+    if (user?.userType === 'PROFESSIONAL') {
+      await fastify.prisma.professionalProfile.update({
+        where: { userId },
+        data: {
+          ratingAvg: 0,
+          reviewCount: 0,
+        },
+      });
+    }
     return;
   }
 
   const avgRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length;
   const totalReviews = reviews.length;
 
-  await fastify.prisma.user.update({
-    where: { id: userId },
-    data: {
-      rating: Math.round(avgRating * 10) / 10,
-      reviewCount: totalReviews,
-    },
-  });
+  if (user?.userType === 'PROFESSIONAL') {
+    await fastify.prisma.professionalProfile.update({
+      where: { userId },
+      data: {
+        ratingAvg: Math.round(avgRating * 10) / 10,
+        reviewCount: totalReviews,
+      },
+    });
+  }
 }
 
 export default reviewRoute;

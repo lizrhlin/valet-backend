@@ -23,9 +23,12 @@ export const registerSchema = z.object({
   userType: userTypeSchema.default('CLIENT'),
   cpf: cpfSchema.optional(),
   // Campos para profissionais
+  primaryCategoryId: z.number().int().positive().optional(),
+  experienceRange: z.string().optional(),
+  description: z.string().optional(),
+  // Compatibilidade legada
   specialty: z.string().optional(),
   experience: z.string().optional(),
-  description: z.string().optional(),
   // Serviços do profissional (subcategorias com preços)
   services: z.array(z.object({
     subcategoryId: z.number().int().positive(),
@@ -52,11 +55,16 @@ export const professionalServiceSchema = z.object({
 });
 
 export const completeProfessionalRegistrationSchema = z.object({
-  specialty: z.string().min(3, 'Especialização deve ter no mínimo 3 caracteres'),
+  primaryCategoryId: z.number().int().positive().optional(),
+  experienceRange: z.string().min(1, 'Experiência é obrigatória'),
   description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
-  experience: z.string().min(3, 'Experiência é obrigatória'),
-  location: z.string().min(3, 'Localização é obrigatória'),
+  // Compatibilidade legada
+  specialty: z.string().optional(),
+  experience: z.string().optional(),
   services: z.array(professionalServiceSchema).min(1, 'Selecione pelo menos um serviço'),
+}).refine((data) => data.primaryCategoryId || data.specialty, {
+  message: 'Selecione uma especialidade principal',
+  path: ['primaryCategoryId'],
 });
 
 export const loginSchema = z.object({
@@ -124,8 +132,17 @@ export const userResponseSchema = z.object({
   status: userStatusSchema,
   notificationsEnabled: z.boolean(),
   language: z.string(),
-  rating: z.number().default(0),
-  reviewCount: z.number().default(0),
+  professionalProfile: z.object({
+    id: idSchema,
+    primaryCategoryId: z.number().nullable().optional(),
+    experienceRange: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    isVerified: z.boolean(),
+    isAvailable: z.boolean(),
+    servicesCompleted: z.number(),
+    ratingAvg: z.number(),
+    reviewCount: z.number(),
+  }).optional().nullable(),
   createdAt: z.union([z.string().datetime(), z.date()]).transform(val => 
     val instanceof Date ? val.toISOString() : val
   ),

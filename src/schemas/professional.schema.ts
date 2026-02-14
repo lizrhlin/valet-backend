@@ -6,13 +6,10 @@ import { idSchema, priceSchema, latitudeSchema, longitudeSchema } from './common
 // ============================================
 
 export const createProfessionalProfileSchema = z.object({
-  specialty: z.string().min(3, 'Especialização deve ter no mínimo 3 caracteres'),
-  description: z.string().min(20, 'Descrição deve ter no mínimo 20 caracteres'),
-  experience: z.string().min(1, 'Experiência é obrigatória'),
-  location: z.string().min(3, 'Localização é obrigatória'),
-  latitude: latitudeSchema.optional(),
-  longitude: longitudeSchema.optional(),
-  available: z.boolean().optional().default(true),
+  primaryCategoryId: z.number().int().positive().optional(),
+  experienceRange: z.string().min(1, 'Experiência é obrigatória'),
+  description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
+  isAvailable: z.boolean().optional().default(false),
 });
 
 export const updateProfessionalProfileSchema = createProfessionalProfileSchema.partial();
@@ -79,17 +76,17 @@ export const professionalSubcategoryResponseSchema = z.object({
 export const professionalResponseSchema = z.object({
   id: idSchema,
   userId: idSchema,
-  specialty: z.string(),
-  description: z.string(),
-  experience: z.string(),
-  servicesCompleted: z.number(),
-  available: z.boolean(),
-  isVerified: z.boolean(),
-  location: z.string(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  rating: z.number(),
-  reviewCount: z.number(),
+  professionalProfile: z.object({
+    id: idSchema,
+    primaryCategoryId: z.number().nullable().optional(),
+    experienceRange: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    isAvailable: z.boolean(),
+    isVerified: z.boolean(),
+    servicesCompleted: z.number(),
+    ratingAvg: z.number(),
+    reviewCount: z.number(),
+  }),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   user: z.object({

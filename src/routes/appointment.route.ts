@@ -15,8 +15,6 @@ const clientSelect = {
   phone: true,
   avatar: true,
   createdAt: true,
-  rating: true,
-  reviewCount: true,
 };
 
 // Helper para incluir dados completos do profissional
@@ -26,8 +24,12 @@ const professionalSelect = {
   email: true,
   phone: true,
   avatar: true,
-  rating: true,
-  reviewCount: true,
+  professionalProfile: {
+    select: {
+      ratingAvg: true,
+      reviewCount: true,
+    },
+  },
 };
 
 const appointmentRoute: FastifyPluginAsync = async (fastify) => {
@@ -79,14 +81,6 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
       });
 
       
-      if (!address) {
-        // Mostrar endereços disponíveis para debug
-        const userAddresses = await fastify.prisma.address.findMany({
-          where: { userId },
-          select: { id: true, street: true, number: true, isDefault: true },
-        });
-      }
-
       if (!address) {
         reply.code(404);
         return { error: 'Address not found' };
@@ -470,8 +464,8 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
       });
 
       // Incrementar contador de serviços completados do profissional
-      await fastify.prisma.user.update({
-        where: { id: appointment.professionalId },
+      await fastify.prisma.professionalProfile.update({
+        where: { userId: appointment.professionalId },
         data: { servicesCompleted: { increment: 1 } },
       });
 
