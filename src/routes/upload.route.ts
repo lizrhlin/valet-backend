@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { MultipartFile } from "@fastify/multipart";
+import { z } from "zod";
 
 export async function registerUploadRoutes(fastify: FastifyInstance) {
   // Ensure upload directory exists
@@ -14,7 +15,7 @@ export async function registerUploadRoutes(fastify: FastifyInstance) {
   }
 
   // POST /uploads - Upload file
-  fastify.post<{ Body: any }>(
+  fastify.post(
     "/uploads",
     {
       schema: {
@@ -23,21 +24,16 @@ export async function registerUploadRoutes(fastify: FastifyInstance) {
         description: "Upload a document or image file and return its URL",
         consumes: ["multipart/form-data"],
         response: {
-          200: {
-            description: "File uploaded successfully",
-            type: "object",
-            properties: {
-              url: { type: "string", example: "/uploads/123e4567-e89b-12d3-a456-426614174000.jpg" },
-              filename: { type: "string" },
-            },
-          },
-          400: {
-            description: "Bad request - No file provided",
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
-          },
+          200: z.object({
+            url: z.string(),
+            filename: z.string(),
+          }),
+          400: z.object({
+            error: z.string(),
+          }),
+          500: z.object({
+            error: z.string(),
+          }),
         },
       },
     },
@@ -84,8 +80,13 @@ export async function registerUploadRoutes(fastify: FastifyInstance) {
         // Save file to disk
         await fs.writeFile(filePath, buffer);
 
-        // Return relative URL
-        const url = `/uploads/${uniqueFilename}`;
+        // Return absolute URL
+        // Em produção, use a URL real do servidor
+        const host = request.headers.host || 'localhost:3000';
+        const protocol = request.headers['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
+        const url = `${protocol}://${host}/uploads/${uniqueFilename}`;
+
+        fastify.log.info(`File uploaded successfully: ${url}`);
 
         return reply.status(200).send({
           url,
