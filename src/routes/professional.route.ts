@@ -2,8 +2,10 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import {
   searchProfessionalsSchema,
+  searchProfessionalsGeoSchema,
   professionalIdParamSchema,
   SearchProfessionalsInput,
+  SearchProfessionalsGeoInput,
 } from '../schemas/professional.schema.js';
 
 const professionalRoute: FastifyPluginAsync = async (fastify) => {
@@ -126,6 +128,151 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           reviewCount: prof.professionalProfile?.reviewCount ?? 0,
           createdAt: prof.createdAt.toISOString(),
           updatedAt: prof.updatedAt.toISOString(),
+        })),
+        total,
+        page,
+        limit,
+        totalPages,
+      };
+    }
+  );
+
+  // ============================================
+  // POST /professionals/search — Busca geo com earth_distance
+  // ============================================
+  fastify.post<{ Body: SearchProfessionalsGeoInput }>(
+    '/professionals/search',
+    {
+      schema: {
+        tags: ['professionals'],
+        description: 'Search professionals by geolocation (earth_distance)',
+        body: searchProfessionalsGeoSchema,
+      },
+    },
+    async (request, reply) => {
+      const { lat, lng, subcategoryId, categoryId, minRating, available, page = 1, limit = 10 } = request.body;
+
+      // Validação redundante (Zod já valida, mas garantia explícita)
+      if (lat == null || lng == null) {
+        reply.code(400);
+        return {
+          error: 'LOCATION_REQUIRED',
+          message: 'Selecione um endereço válido com localização para encontrar profissionais próximos.',
+        };
+      }
+
+      // Construir filtros SQL dinâmicos
+      const conditions: string[] = [
+        `u."userType" = 'PROFESSIONAL'`,
+        `pp."latitude" IS NOT NULL`,
+        `pp."longitude" IS NOT NULL`,
+        // earth_distance: calcula distância em metros entre duas coordenadas
+        `earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2)) <= pp."service_radius_km" * 1000`,
+      ];
+      const params: any[] = [lat, lng];
+      let paramIndex = 3;
+
+      // Filtro por subcategoria (obrigatório)
+      conditions.push(`ps."subcategory_id" = $${paramIndex}`);
+      params.push(subcategoryId);
+      paramIndex++;
+
+      // Filtro por categoria (opcional)
+      if (categoryId) {
+        conditions.push(`EXISTS (SELECT 1 FROM professional_categories pc WHERE pc."professional_id" = u."id" AND pc."category_id" = $${paramIndex})`);
+        params.push(categoryId);
+        paramIndex++;
+      }
+
+      // Filtro por rating mínimo
+      if (minRating != null) {
+        conditions.push(`pp."rating_avg" >= $${paramIndex}`);
+        params.push(minRating);
+        paramIndex++;
+      }
+
+      // Filtro por disponibilidade
+      if (available === true) {
+        conditions.push(`pp."is_available" = true`);
+      } else if (available === false) {
+        conditions.push(`pp."is_available" = false`);
+      }
+
+      const whereClause = conditions.join(' AND ');
+
+      // Count total
+      const countQuery = `
+        SELECT COUNT(DISTINCT u."id")::int AS total
+        FROM users u
+        INNER JOIN professional_profiles pp ON pp."user_id" = u."id"
+        INNER JOIN professional_subcategories ps ON ps."professional_id" = u."id" AND ps."isActive" = true
+        WHERE ${whereClause}
+      `;
+
+      const countResult = await fastify.prisma.$queryRawUnsafe<[{ total: number }]>(countQuery, ...params);
+      const total = countResult[0]?.total ?? 0;
+      const totalPages = Math.ceil(total / limit);
+      const offset = (page - 1) * limit;
+
+      // Main query — ordered by distance ASC
+      const dataQuery = `
+        SELECT
+          u."id",
+          u."name",
+          u."email",
+          u."phone",
+          u."avatar",
+          u."createdAt",
+          u."updatedAt",
+          pp."latitude",
+          pp."longitude",
+          pp."service_radius_km" AS "serviceRadiusKm",
+          pp."is_available" AS "isAvailable",
+          pp."is_verified" AS "isVerified",
+          pp."rating_avg" AS "ratingAvg",
+          pp."review_count" AS "reviewCount",
+          pp."services_completed" AS "servicesCompleted",
+          pp."experience_range" AS "experienceRange",
+          pp."description",
+          pp."primary_category_id" AS "primaryCategoryId",
+          ROUND(earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2))::numeric, 0) AS "distanceMeters",
+          ps."price_cents" AS "priceCents",
+          ps."subcategory_id" AS "subcategoryId"
+        FROM users u
+        INNER JOIN professional_profiles pp ON pp."user_id" = u."id"
+        INNER JOIN professional_subcategories ps ON ps."professional_id" = u."id" AND ps."isActive" = true
+        WHERE ${whereClause}
+        ORDER BY earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2)) ASC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+
+      params.push(limit, offset);
+
+      const professionals = await fastify.prisma.$queryRawUnsafe<any[]>(dataQuery, ...params);
+
+      return {
+        professionals: professionals.map((prof: any) => ({
+          id: prof.id,
+          name: prof.name,
+          email: prof.email,
+          phone: prof.phone,
+          avatar: prof.avatar,
+          latitude: prof.latitude,
+          longitude: prof.longitude,
+          serviceRadiusKm: prof.serviceRadiusKm,
+          available: prof.isAvailable ?? false,
+          isVerified: prof.isVerified ?? false,
+          rating: Number(prof.ratingAvg) || 0,
+          reviewCount: Number(prof.reviewCount) || 0,
+          servicesCompleted: Number(prof.servicesCompleted) || 0,
+          experienceRange: prof.experienceRange,
+          description: prof.description,
+          distanceMeters: Number(prof.distanceMeters) || 0,
+          distanceKm: Number(((Number(prof.distanceMeters) || 0) / 1000).toFixed(1)),
+          priceCents: Number(prof.priceCents) || 0,
+          subcategoryId: prof.subcategoryId,
+          createdAt: prof.createdAt instanceof Date ? prof.createdAt.toISOString() : prof.createdAt,
+          updatedAt: prof.updatedAt instanceof Date ? prof.updatedAt.toISOString() : prof.updatedAt,
         })),
         total,
         page,

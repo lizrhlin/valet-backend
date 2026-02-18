@@ -10,6 +10,9 @@ export const createProfessionalProfileSchema = z.object({
   experienceRange: z.string().min(1, 'Experiência é obrigatória'),
   description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
   isAvailable: z.boolean().optional().default(false),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
+  serviceRadiusKm: z.number().positive().optional().default(10),
 });
 
 export const updateProfessionalProfileSchema = createProfessionalProfileSchema.partial();
@@ -34,18 +37,28 @@ export const updateProfessionalServiceSchema = z.object({
 // BUSCAR PROFISSIONAIS
 // ============================================
 
+// Schema de busca legado (GET /professionals - sem geo)
 export const searchProfessionalsSchema = z.object({
   subcategoryId: z.coerce.number().int().positive().optional(),
   categoryId: z.coerce.number().int().positive().optional(),
-  latitude: latitudeSchema.optional(),
-  longitude: longitudeSchema.optional(),
-  maxDistance: z.coerce.number().positive().optional(), // em km
   minRating: z.coerce.number().min(0).max(5).optional(),
   available: z.boolean().optional(),
   sortBy: z.enum(['rating', 'price', 'distance', 'servicesCompleted']).optional().default('rating'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(10),
+});
+
+// Schema principal de busca geo (POST /professionals/search)
+export const searchProfessionalsGeoSchema = z.object({
+  lat: latitudeSchema,
+  lng: longitudeSchema,
+  subcategoryId: z.number().int().positive(),
+  categoryId: z.number().int().positive().optional(),
+  minRating: z.number().min(0).max(5).optional(),
+  available: z.boolean().optional(),
+  page: z.number().int().positive().optional().default(1),
+  limit: z.number().int().positive().max(50).optional().default(10),
 });
 
 // ============================================
@@ -108,4 +121,5 @@ export type UpdateProfessionalProfileInput = z.infer<typeof updateProfessionalPr
 export type AddServiceToProfessionalInput = z.infer<typeof addServiceToProfessionalSchema>;
 export type UpdateProfessionalServiceInput = z.infer<typeof updateProfessionalServiceSchema>;
 export type SearchProfessionalsInput = z.infer<typeof searchProfessionalsSchema>;
+export type SearchProfessionalsGeoInput = z.infer<typeof searchProfessionalsGeoSchema>;
 export type ProfessionalResponse = z.infer<typeof professionalResponseSchema>;

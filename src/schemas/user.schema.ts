@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { emailSchema, passwordSchema, phoneSchema, cpfSchema, idSchema } from './common.schema.js';
+import { emailSchema, passwordSchema, phoneSchema, cpfSchema, idSchema, latitudeSchema, longitudeSchema } from './common.schema.js';
 
 // ============================================
 // ENUMS
@@ -41,6 +41,10 @@ export const registerSchema = z.object({
     subcategoryId: z.number().int().positive(),
     price: z.string(), // Formato: "150,00"
   })).optional(),
+  // Geolocalização (obrigatória para profissionais)
+  latitude: latitudeSchema.optional(),
+  longitude: longitudeSchema.optional(),
+  serviceRadiusKm: z.number().positive().optional(),
   address: z.object({
     street: z.string().optional(),
     number: z.string().optional(),
@@ -78,6 +82,17 @@ export const registerSchema = z.object({
 }, {
   message: 'Envio de documentos é obrigatório para profissionais (selfie com documento e foto do documento)',
   path: ['documents'],
+}).refine((data) => {
+  // Se for profissional, latitude/longitude são obrigatórios
+  if (data.userType === 'PROFESSIONAL') {
+    if (data.latitude == null || data.longitude == null) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: 'Localização (latitude/longitude) é obrigatória para profissionais',
+  path: ['latitude'],
 });
 
 // ============================================

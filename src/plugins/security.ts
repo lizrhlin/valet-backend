@@ -38,6 +38,11 @@ const securityPlugin: FastifyPluginAsync = async (fastify) => {
 
   // Limites de payload
   fastify.addHook('onRequest', async (request, reply) => {
+    // Rotas de upload têm limite próprio (10MB via multipart plugin)
+    if (request.url.startsWith('/api/uploads')) {
+      return;
+    }
+
     const maxPayloadSize = 1024 * 1024; // 1MB
     if (request.headers['content-length']) {
       const contentLength = parseInt(request.headers['content-length'], 10);

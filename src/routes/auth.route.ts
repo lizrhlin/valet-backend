@@ -194,6 +194,10 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           // Compatibilidade legada
           specialty: z.string().optional(),
           experience: z.string().optional(),
+          // Geolocalização obrigatória
+          latitude: z.number().min(-90).max(90),
+          longitude: z.number().min(-180).max(180),
+          serviceRadiusKm: z.number().positive().optional().default(10),
           services: z.array(z.object({
             subcategoryId: z.number().int().positive('ID da subcategoria inválido'),
             price: z.string().min(1, 'Preço é obrigatório'), // Formato: "150,00"
@@ -229,9 +233,12 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           description: string;
           specialty?: string;
           experience?: string;
+          latitude: number;
+          longitude: number;
+          serviceRadiusKm?: number;
           services: Array<{ subcategoryId: number; price: string }>;
         };
-        const { primaryCategoryId, experienceRange, description, specialty, experience, services } = body;
+        const { primaryCategoryId, experienceRange, description, specialty, experience, latitude, longitude, serviceRadiusKm, services } = body;
 
         // Verificar se o usuário existe e é profissional
         const user = await fastify.prisma.user.findUnique({
@@ -266,12 +273,18 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
             primaryCategoryId: resolvedPrimaryCategoryId,
             experienceRange: resolvedExperienceRange,
             description,
+            latitude,
+            longitude,
+            serviceRadiusKm: serviceRadiusKm ?? 10,
           },
           create: {
             userId,
             primaryCategoryId: resolvedPrimaryCategoryId,
             experienceRange: resolvedExperienceRange,
             description,
+            latitude,
+            longitude,
+            serviceRadiusKm: serviceRadiusKm ?? 10,
             isAvailable: false,
             isVerified: false,
           },

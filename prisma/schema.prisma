@@ -168,6 +168,11 @@ model ProfessionalProfile {
   // Bio
   description String? @db.Text
 
+  // Geolocalização (obrigatória para profissionais)
+  latitude        Float    @map("latitude")
+  longitude       Float    @map("longitude")
+  serviceRadiusKm Float    @default(10) @map("service_radius_km")
+
   // Status do profissional
   isVerified  Boolean @default(false) @map("is_verified")
   isAvailable Boolean @default(false) @map("is_available")
@@ -188,6 +193,7 @@ model ProfessionalProfile {
   @@index([primaryCategoryId])
   @@index([isAvailable])
   @@index([isVerified])
+  @@index([latitude, longitude])
 }
 
 // ============================================

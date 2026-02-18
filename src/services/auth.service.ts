@@ -34,6 +34,11 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
     if (!input.avatar) {
       throw new Error('Foto de perfil é obrigatória para profissionais');
     }
+
+    // Validar geolocalização (obrigatória para profissionais)
+    if (input.latitude == null || input.longitude == null) {
+      throw new Error('Localização (latitude/longitude) é obrigatória para profissionais');
+    }
     
     // Validar documentos
     if (!input.documents || input.documents.length < 2) {
@@ -81,6 +86,8 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
               city: input.address.city,
               state: input.address.state || '',
               zipCode: input.address.zipCode || '',
+              latitude: input.latitude ?? null,
+              longitude: input.longitude ?? null,
               isDefault: true,
             },
           },
@@ -108,6 +115,9 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
           primaryCategoryId,
           experienceRange,
           description: input.description || null,
+          latitude: input.latitude!,
+          longitude: input.longitude!,
+          serviceRadiusKm: input.serviceRadiusKm ?? 10,
           isAvailable: false,
           isVerified: false,
           onboardingStatus: 'SUBMITTED', // Profissional completou cadastro

@@ -86,6 +86,15 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'Address not found' };
       }
 
+      // Verificar se o endereço possui coordenadas (obrigatório para agendamento)
+      if (address.latitude == null || address.longitude == null) {
+        reply.code(400);
+        return {
+          error: 'LOCATION_REQUIRED',
+          message: 'Selecione um endereço válido com localização para encontrar profissionais próximos.',
+        };
+      }
+
       // Gerar número único
       const orderNumber = `LIZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
