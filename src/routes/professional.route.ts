@@ -138,6 +138,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
             rating: prof.professionalProfile?.ratingAvg ?? 0,
             reviewCount: prof.professionalProfile?.reviewCount ?? 0,
             location: locationParts.length > 0 ? locationParts.join(', ') : null,
+            latitude: prof.professionalProfile?.latitude ?? null,
+            longitude: prof.professionalProfile?.longitude ?? null,
             createdAt: prof.createdAt.toISOString(),
             updatedAt: prof.updatedAt.toISOString(),
           };
@@ -382,6 +384,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         rating: professional.professionalProfile?.ratingAvg ?? 0,
         reviewCount: professional.professionalProfile?.reviewCount ?? 0,
         location: locationParts.length > 0 ? locationParts.join(', ') : null,
+        latitude: professional.professionalProfile?.latitude ?? null,
+        longitude: professional.professionalProfile?.longitude ?? null,
         createdAt: professional.createdAt.toISOString(),
         updatedAt: professional.updatedAt.toISOString(),
       };
