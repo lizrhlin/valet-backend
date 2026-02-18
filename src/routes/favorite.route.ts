@@ -21,13 +21,8 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
       const favorites = await fastify.prisma.favorite.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-      });
-
-      // Buscar dados dos profissionais
-      const professionals = await Promise.all(
-        favorites.map(async (fav) => {
-          const professional = await fastify.prisma.professional.findUnique({
-            where: { id: fav.professionalId },
+        include: {
+          professional: {
             include: {
               user: {
                 select: {
@@ -48,17 +43,17 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
                 },
               },
             },
-          });
+          },
+        },
+      });
 
-          return {
-            favoriteId: fav.id,
-            createdAt: fav.createdAt.toISOString(),
-            professional,
-          };
-        })
-      );
-
-      return professionals.filter(p => p.professional !== null);
+      return favorites
+        .filter(fav => fav.professional !== null)
+        .map(fav => ({
+          favoriteId: fav.id,
+          createdAt: fav.createdAt.toISOString(),
+          professional: fav.professional,
+        }));
     }
   );
 
