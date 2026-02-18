@@ -190,7 +190,6 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         body: z.object({
           primaryCategoryId: z.number().int().positive().optional(),
           experienceRange: z.string().min(1, 'Experiência é obrigatória'),
-          description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
           // Compatibilidade legada
           specialty: z.string().optional(),
           experience: z.string().optional(),
@@ -230,7 +229,6 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         const body = request.body as {
           primaryCategoryId?: number;
           experienceRange?: string;
-          description: string;
           specialty?: string;
           experience?: string;
           latitude: number;
@@ -238,7 +236,7 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           serviceRadiusKm?: number;
           services: Array<{ subcategoryId: number; price: string }>;
         };
-        const { primaryCategoryId, experienceRange, description, specialty, experience, latitude, longitude, serviceRadiusKm, services } = body;
+        const { primaryCategoryId, experienceRange, specialty, experience, latitude, longitude, serviceRadiusKm, services } = body;
 
         // Verificar se o usuário existe e é profissional
         const user = await fastify.prisma.user.findUnique({
@@ -272,7 +270,6 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
           update: {
             primaryCategoryId: resolvedPrimaryCategoryId,
             experienceRange: resolvedExperienceRange,
-            description,
             latitude,
             longitude,
             serviceRadiusKm: serviceRadiusKm ?? 10,
@@ -281,7 +278,6 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
             userId,
             primaryCategoryId: resolvedPrimaryCategoryId,
             experienceRange: resolvedExperienceRange,
-            description,
             latitude,
             longitude,
             serviceRadiusKm: serviceRadiusKm ?? 10,

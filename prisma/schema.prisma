@@ -165,8 +165,6 @@ model ProfessionalProfile {
   // “Anos de experiência”
   experienceRange String? @map("experience_range")
 
-  // Bio
-  description String? @db.Text
 
   // Geolocalização (obrigatória para profissionais)
   latitude        Float    @map("latitude")

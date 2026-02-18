@@ -109,6 +109,15 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
               },
             },
           },
+          addresses: {
+            where: { isDefault: true },
+            select: {
+              city: true,
+              state: true,
+              neighborhood: true,
+            },
+            take: 1,
+          },
         },
         orderBy,
         skip,
@@ -116,19 +125,23 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       });
 
       return {
-        professionals: professionals.map(prof => ({
-          ...prof,
-          specialty: prof.professionalProfile?.primaryCategory?.name || null,
-          experience: prof.professionalProfile?.experienceRange || null,
-          description: prof.professionalProfile?.description || null,
-          servicesCompleted: prof.professionalProfile?.servicesCompleted ?? 0,
-          available: prof.professionalProfile?.isAvailable ?? false,
-          isVerified: prof.professionalProfile?.isVerified ?? false,
-          rating: prof.professionalProfile?.ratingAvg ?? 0,
-          reviewCount: prof.professionalProfile?.reviewCount ?? 0,
-          createdAt: prof.createdAt.toISOString(),
-          updatedAt: prof.updatedAt.toISOString(),
-        })),
+        professionals: professionals.map(prof => {
+          const defaultAddress = prof.addresses?.[0];
+          const locationParts = [defaultAddress?.neighborhood, defaultAddress?.city, defaultAddress?.state].filter(Boolean);
+          return {
+            ...prof,
+            specialty: prof.professionalProfile?.primaryCategory?.name || null,
+            experience: prof.professionalProfile?.experienceRange || null,
+            servicesCompleted: prof.professionalProfile?.servicesCompleted ?? 0,
+            available: prof.professionalProfile?.isAvailable ?? false,
+            isVerified: prof.professionalProfile?.isVerified ?? false,
+            rating: prof.professionalProfile?.ratingAvg ?? 0,
+            reviewCount: prof.professionalProfile?.reviewCount ?? 0,
+            location: locationParts.length > 0 ? locationParts.join(', ') : null,
+            createdAt: prof.createdAt.toISOString(),
+            updatedAt: prof.updatedAt.toISOString(),
+          };
+        }),
         total,
         page,
         limit,
@@ -233,7 +246,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           pp."review_count" AS "reviewCount",
           pp."services_completed" AS "servicesCompleted",
           pp."experience_range" AS "experienceRange",
-          pp."description",
           pp."primary_category_id" AS "primaryCategoryId",
           ROUND(earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2))::numeric, 0) AS "distanceMeters",
           ps."price_cents" AS "priceCents",
@@ -266,7 +278,6 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           reviewCount: Number(prof.reviewCount) || 0,
           servicesCompleted: Number(prof.servicesCompleted) || 0,
           experienceRange: prof.experienceRange,
-          description: prof.description,
           distanceMeters: Number(prof.distanceMeters) || 0,
           distanceKm: Number(((Number(prof.distanceMeters) || 0) / 1000).toFixed(1)),
           priceCents: Number(prof.priceCents) || 0,
@@ -341,6 +352,15 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
               },
             },
           },
+          addresses: {
+            where: { isDefault: true },
+            select: {
+              city: true,
+              state: true,
+              neighborhood: true,
+            },
+            take: 1,
+          },
         },
       });
 
@@ -349,16 +369,19 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'Professional not found' };
       }
 
+      const defaultAddress = professional.addresses?.[0];
+      const locationParts = [defaultAddress?.neighborhood, defaultAddress?.city, defaultAddress?.state].filter(Boolean);
+
       return {
         ...professional,
         specialty: professional.professionalProfile?.primaryCategory?.name || null,
         experience: professional.professionalProfile?.experienceRange || null,
-        description: professional.professionalProfile?.description || null,
         servicesCompleted: professional.professionalProfile?.servicesCompleted ?? 0,
         available: professional.professionalProfile?.isAvailable ?? false,
         isVerified: professional.professionalProfile?.isVerified ?? false,
         rating: professional.professionalProfile?.ratingAvg ?? 0,
         reviewCount: professional.professionalProfile?.reviewCount ?? 0,
+        location: locationParts.length > 0 ? locationParts.join(', ') : null,
         createdAt: professional.createdAt.toISOString(),
         updatedAt: professional.updatedAt.toISOString(),
       };

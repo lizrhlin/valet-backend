@@ -27,7 +27,6 @@ export const registerSchema = z.object({
   // Campos para profissionais
   primaryCategoryId: z.number().int().positive().optional(),
   experienceRange: z.string().optional(),
-  description: z.string().optional(),
   // Compatibilidade legada
   specialty: z.string().optional(),
   experience: z.string().optional(),

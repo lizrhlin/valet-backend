@@ -114,7 +114,6 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
           userId: newUser.id,
           primaryCategoryId,
           experienceRange,
-          description: input.description || null,
           latitude: input.latitude!,
           longitude: input.longitude!,
           serviceRadiusKm: input.serviceRadiusKm ?? 10,

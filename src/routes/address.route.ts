@@ -43,6 +43,40 @@ const addressRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Buscar endereço padrão do usuário
+  fastify.get(
+    '/addresses/default',
+    {
+      schema: {
+        tags: ['addresses'],
+        description: 'Get user default address',
+        response: {
+          200: addressResponseSchema,
+          404: z.object({ error: z.string() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user.userId;
+
+      const address = await fastify.prisma.address.findFirst({
+        where: { userId, isDefault: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!address) {
+        reply.code(404);
+        return { error: 'No default address found' };
+      }
+
+      return {
+        ...address,
+        createdAt: address.createdAt.toISOString(),
+        updatedAt: address.updatedAt.toISOString(),
+      };
+    }
+  );
+
   // Buscar endereço por ID
   fastify.get<{ Params: { addressId: string } }>(
     '/addresses/:addressId',
