@@ -8,6 +8,7 @@ import { idSchema, timeSchema } from './common.schema.js';
 export const appointmentStatusSchema = z.enum([
   'PENDING',
   'CONFIRMED',
+  'ON_WAY',
   'IN_PROGRESS',
   'COMPLETED',
   'CANCELLED',

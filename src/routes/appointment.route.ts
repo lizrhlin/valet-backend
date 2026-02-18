@@ -95,6 +95,24 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         };
       }
 
+      // Verificar se o profissional já tem agendamento no mesmo horário
+      const existingAppointment = await fastify.prisma.appointment.findFirst({
+        where: {
+          professionalId: professionalProfile.id,
+          scheduledDate: new Date(data.scheduledDate),
+          scheduledTime: data.scheduledTime,
+          status: { notIn: ['CANCELLED', 'REJECTED'] },
+        },
+      });
+
+      if (existingAppointment) {
+        reply.code(409);
+        return {
+          error: 'SLOT_UNAVAILABLE',
+          message: 'Este horário já está ocupado. Por favor, escolha outro horário.',
+        };
+      }
+
       // Gerar número único
       const orderNumber = `LIZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
