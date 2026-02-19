@@ -539,11 +539,21 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       const { professionalId } = request.params;
       const { startDate, endDate } = request.query;
 
-      const where: any = { professionalId };
+      // Sempre filtrar datas passadas — nunca retornar disponibilidade de ontem
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+
+      const where: any = {
+        professionalId,
+        date: { gte: today },
+      };
 
       if (startDate || endDate) {
-        where.date = {};
-        if (startDate) where.date.gte = new Date(startDate);
+        if (startDate) {
+          const start = new Date(startDate);
+          // Usar a data mais recente entre startDate e hoje
+          where.date.gte = start > today ? start : today;
+        }
         if (endDate) where.date.lte = new Date(endDate);
       }
 

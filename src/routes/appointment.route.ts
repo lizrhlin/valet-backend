@@ -52,6 +52,20 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       // 🔍 Log dos dados recebidos
 
+      // Validar que o horário não é no passado
+      // Combina scheduledDate + scheduledTime para comparar com o momento atual
+      const scheduledDateTime = new Date(data.scheduledDate);
+      const [hours, minutes] = data.scheduledTime.split(':').map(Number);
+      scheduledDateTime.setUTCHours(hours, minutes, 0, 0);
+
+      if (scheduledDateTime.getTime() <= Date.now()) {
+        reply.code(400);
+        return {
+          error: 'PAST_DATETIME',
+          message: 'Não é possível agendar em um horário que já passou.',
+        };
+      }
+
       // Verificar se o profissional existe
       const professionalProfile = await fastify.prisma.user.findUnique({
         where: { id: data.professionalId },
