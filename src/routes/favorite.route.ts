@@ -12,7 +12,7 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         tags: ['favorites'],
-        description: 'List user favorites',
+        description: 'List user favorites with full professional data',
       },
     },
     async (request) => {
@@ -101,40 +101,13 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Verificar se profissional está nos favoritos
-  fastify.get<{ Params: { professionalId: string } }>(
-    '/favorites/check/:professionalId',
-    {
-      schema: {
-        tags: ['favorites'],
-        description: 'Check if professional is favorited',
-        params: z.object({ professionalId: z.string() }),
-      },
-    },
-    async (request) => {
-      const userId = request.user.userId;
-      const { professionalId } = request.params;
-
-      const favorite = await fastify.prisma.favorite.findUnique({
-        where: {
-          userId_professionalId: {
-            userId,
-            professionalId,
-          },
-        },
-      });
-
-      return { isFavorite: !!favorite };
-    }
-  );
-
   // Adicionar favorito
   fastify.post(
     '/favorites',
     {
       schema: {
         tags: ['favorites'],
-        description: 'Add favorite',
+        description: 'Add a professional to favorites',
         body: z.object({ professionalId: z.string() }),
       },
     },
@@ -142,12 +115,9 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
       const { professionalId } = request.body as { professionalId: string };
 
-      // Verificar se profissional existe (buscar em User com userType PROFESSIONAL)
+      // Verificar se profissional existe
       const professional = await fastify.prisma.user.findFirst({
-        where: { 
-          id: professionalId,
-          userType: 'PROFESSIONAL'
-        },
+        where: { id: professionalId, userType: 'PROFESSIONAL' },
       });
 
       if (!professional) {
@@ -155,31 +125,19 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'Professional not found' };
       }
 
-      // Verificar se já existe
-      const existing = await fastify.prisma.favorite.findUnique({
+      // Usar upsert para evitar race condition (idempotente)
+      const favorite = await fastify.prisma.favorite.upsert({
         where: {
-          userId_professionalId: {
-            userId,
-            professionalId,
-          },
+          userId_professionalId: { userId, professionalId },
         },
-      });
-
-      if (existing) {
-        reply.code(400);
-        return { error: 'Already favorited' };
-      }
-
-      const favorite = await fastify.prisma.favorite.create({
-        data: {
-          userId,
-          professionalId,
-        },
+        update: {}, // já existe, não faz nada
+        create: { userId, professionalId },
       });
 
       reply.code(201);
       return {
-        ...favorite,
+        id: favorite.id,
+        professionalId: favorite.professionalId,
         createdAt: favorite.createdAt.toISOString(),
       };
     }
@@ -191,7 +149,7 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         tags: ['favorites'],
-        description: 'Remove favorite',
+        description: 'Remove a professional from favorites',
         params: z.object({ professionalId: z.string() }),
       },
     },
@@ -199,97 +157,16 @@ const favoriteRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
       const { professionalId } = request.params;
 
-      const favorite = await fastify.prisma.favorite.findUnique({
-        where: {
-          userId_professionalId: {
-            userId,
-            professionalId,
-          },
-        },
+      const deleted = await fastify.prisma.favorite.deleteMany({
+        where: { userId, professionalId },
       });
 
-      if (!favorite) {
+      if (deleted.count === 0) {
         reply.code(404);
         return { error: 'Favorite not found' };
       }
 
-      await fastify.prisma.favorite.delete({
-        where: {
-          userId_professionalId: {
-            userId,
-            professionalId,
-          },
-        },
-      });
-
       return { message: 'Favorite removed successfully' };
-    }
-  );
-
-  // Toggle favorito
-  fastify.post(
-    '/favorites/toggle',
-    {
-      schema: {
-        tags: ['favorites'],
-        description: 'Toggle favorite',
-        body: z.object({ professionalId: z.string() }),
-      },
-    },
-    async (request) => {
-      const userId = request.user.userId;
-      const { professionalId } = request.body as { professionalId: string };
-
-      const existing = await fastify.prisma.favorite.findUnique({
-        where: {
-          userId_professionalId: {
-            userId,
-            professionalId,
-          },
-        },
-      });
-
-      if (existing) {
-        // Remover
-        await fastify.prisma.favorite.delete({
-          where: {
-            userId_professionalId: {
-              userId,
-              professionalId,
-            },
-          },
-        });
-        return { isFavorite: false, message: 'Removed from favorites' };
-      } else {
-        // Adicionar
-        await fastify.prisma.favorite.create({
-          data: {
-            userId,
-            professionalId,
-          },
-        });
-        return { isFavorite: true, message: 'Added to favorites' };
-      }
-    }
-  );
-
-  // Limpar todos os favoritos
-  fastify.delete(
-    '/favorites/all',
-    {
-      schema: {
-        tags: ['favorites'],
-        description: 'Clear all favorites',
-      },
-    },
-    async (request) => {
-      const userId = request.user.userId;
-
-      const result = await fastify.prisma.favorite.deleteMany({
-        where: { userId },
-      });
-
-      return { message: `Cleared ${result.count} favorites` };
     }
   );
 };

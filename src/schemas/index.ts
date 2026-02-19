@@ -6,6 +6,4 @@ export * from './professional.schema.js';
 export * from './category.schema.js';
 export * from './appointment.schema.js';
 export * from './review.schema.js';
-export * from './favorite.schema.js';
 export * from './notification.schema.js';
-export * from './chat.schema.js';
