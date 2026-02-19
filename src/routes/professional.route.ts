@@ -676,7 +676,43 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         orderBy: [{ date: 'asc' }, { timeSlot: 'asc' }],
       });
 
-      return { customAvailability };
+      // Buscar appointments ativos que bloqueiam slots
+      const blockedAppointments = await fastify.prisma.appointment.findMany({
+        where: {
+          professionalId,
+          scheduledDate: { gte: today },
+          status: { notIn: ['CANCELLED', 'REJECTED'] },
+        },
+        select: {
+          scheduledDate: true,
+          scheduledTime: true,
+        },
+      });
+
+      // Criar set de slots bloqueados: "YYYY-MM-DD|HH:MM"
+      const blockedSet = new Set(
+        blockedAppointments.map(apt => {
+          const d = new Date(apt.scheduledDate);
+          const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+          return `${dateStr}|${apt.scheduledTime}`;
+        })
+      );
+
+      // Enriquecer cada slot com informação de bloqueio
+      const enrichedAvailability = customAvailability.map(slot => {
+        const d = new Date(slot.date);
+        const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+        const key = `${dateStr}|${slot.timeSlot}`;
+        const isBooked = blockedSet.has(key);
+        return {
+          ...slot,
+          isBooked,
+          // Se está reservado, marcar como indisponível
+          isAvailable: slot.isAvailable && !isBooked,
+        };
+      });
+
+      return { customAvailability: enrichedAvailability };
     }
   );
 
