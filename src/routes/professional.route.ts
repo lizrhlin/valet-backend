@@ -9,6 +9,84 @@ import {
 } from '../schemas/professional.schema.js';
 
 const professionalRoute: FastifyPluginAsync = async (fastify) => {
+
+  /**
+   * Retorna os IDs de profissionais que possuem pelo menos 1 slot futuro
+   * disponível (não bloqueado por appointment ativo).
+   */
+  /**
+   * Helper: extrai "YYYY-MM-DD" de um Date usando UTC (Prisma armazena @db.Date como UTC meia-noite)
+   */
+  const toUTCDateStr = (d: Date): string => {
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  };
+
+  const getProfessionalIdsWithFutureSlots = async (): Promise<Set<string>> => {
+    const now = new Date();
+    // Usar hora local para comparar com slots (horários do profissional são em hora local BR)
+    const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    // Data de hoje em UTC para query do Prisma (@db.Date é armazenado como UTC meia-noite)
+    const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const todayStr = toUTCDateStr(todayUTC);
+
+    // Buscar todos os slots futuros disponíveis
+    const futureSlots = await fastify.prisma.customAvailability.findMany({
+      where: {
+        isAvailable: true,
+        date: { gte: todayUTC },
+      },
+      select: {
+        professionalId: true,
+        date: true,
+        timeSlot: true,
+      },
+    });
+
+    // Filtrar slots de hoje que já passaram
+    const validSlots = futureSlots.filter(slot => {
+      const slotDateStr = toUTCDateStr(new Date(slot.date));
+      if (slotDateStr === todayStr) {
+        return slot.timeSlot > nowHHMM;
+      }
+      return true;
+    });
+
+    if (validSlots.length === 0) return new Set();
+
+    // Buscar appointments ativos que bloqueiam slots
+    const blockedAppointments = await fastify.prisma.appointment.findMany({
+      where: {
+        scheduledDate: { gte: todayUTC },
+        status: { notIn: ['CANCELLED', 'REJECTED'] },
+      },
+      select: {
+        professionalId: true,
+        scheduledDate: true,
+        scheduledTime: true,
+      },
+    });
+
+    // Criar set de slots bloqueados: "profId|date|time"
+    const blockedSet = new Set(
+      blockedAppointments.map(apt => {
+        const dateStr = toUTCDateStr(new Date(apt.scheduledDate));
+        return `${apt.professionalId}|${dateStr}|${apt.scheduledTime}`;
+      })
+    );
+
+    // Filtrar slots que não estão bloqueados e coletar profissionais válidos
+    const professionalsWithSlots = new Set<string>();
+    for (const slot of validSlots) {
+      const dateStr = toUTCDateStr(new Date(slot.date));
+      const key = `${slot.professionalId}|${dateStr}|${slot.timeSlot}`;
+      if (!blockedSet.has(key)) {
+        professionalsWithSlots.add(slot.professionalId);
+      }
+    }
+
+    return professionalsWithSlots;
+  };
+
   // Buscar profissionais (com filtros)
   fastify.get(
     '/professionals',
@@ -27,6 +105,19 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       const where: any = {
         userType: 'PROFESSIONAL', // Filtra apenas profissionais
       };
+
+      // Obter IDs de profissionais com slots futuros disponíveis
+      const profsWithFutureSlots = await getProfessionalIdsWithFutureSlots();
+      if (profsWithFutureSlots.size === 0) {
+        return {
+          professionals: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        };
+      }
+      where.id = { in: Array.from(profsWithFutureSlots) };
 
       const profileFilter: any = {};
 
@@ -144,6 +235,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
             location: locationParts.length > 0 ? locationParts.join(', ') : null,
             latitude: prof.professionalProfile?.latitude ?? null,
             longitude: prof.professionalProfile?.longitude ?? null,
+            hasFutureSlots: true,
             createdAt: prof.createdAt.toISOString(),
             updatedAt: prof.updatedAt.toISOString(),
           };
@@ -181,12 +273,33 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       }
 
       // Construir filtros SQL dinâmicos
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
       const conditions: string[] = [
         `u."userType" = 'PROFESSIONAL'`,
         `pp."latitude" IS NOT NULL`,
         `pp."longitude" IS NOT NULL`,
         // earth_distance: calcula distância em metros entre duas coordenadas
         `earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2)) <= pp."service_radius_km" * 1000`,
+        // Filtro de slots futuros disponíveis (sem appointment ativo bloqueando)
+        `EXISTS (
+          SELECT 1 FROM custom_availability ca
+          WHERE ca."professional_id" = u."id"
+            AND ca."isAvailable" = true
+            AND ca."date" >= '${todayStr}'::date
+            AND NOT (
+              ca."date" = '${todayStr}'::date AND ca."timeSlot" <= '${nowHHMM}'
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM appointments apt
+              WHERE apt."professional_id" = ca."professional_id"
+                AND apt."scheduledDate"::date = ca."date"
+                AND apt."scheduledTime" = ca."timeSlot"
+                AND apt."status" NOT IN ('CANCELLED', 'REJECTED')
+            )
+        )`,
       ];
       const params: any[] = [lat, lng];
       let paramIndex = 3;
@@ -288,6 +401,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           distanceKm: Number(((Number(prof.distanceMeters) || 0) / 1000).toFixed(1)),
           priceCents: Number(prof.priceCents) || 0,
           subcategoryId: prof.subcategoryId,
+          hasFutureSlots: true,
           createdAt: prof.createdAt instanceof Date ? prof.createdAt.toISOString() : prof.createdAt,
           updatedAt: prof.updatedAt instanceof Date ? prof.updatedAt.toISOString() : prof.updatedAt,
         })),
