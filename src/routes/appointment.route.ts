@@ -56,9 +56,9 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       // Validar que o horário não é no passado
       // Combina scheduledDate + scheduledTime para comparar com o momento atual
-      const scheduledDateTime = new Date(data.scheduledDate);
-      const [hours, minutes] = data.scheduledTime.split(':').map(Number);
-      scheduledDateTime.setUTCHours(hours, minutes, 0, 0);
+      // O horário do slot (scheduledTime) é em BRT, então criamos a data no timezone do Brasil
+      const dateStr = data.scheduledDate.split('T')[0]; // "YYYY-MM-DD"
+      const scheduledDateTime = new Date(`${dateStr}T${data.scheduledTime}:00-03:00`);
 
       if (scheduledDateTime.getTime() <= Date.now()) {
         reply.code(400);

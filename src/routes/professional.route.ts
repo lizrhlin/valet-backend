@@ -7,6 +7,7 @@ import {
   SearchProfessionalsInput,
   SearchProfessionalsGeoInput,
 } from '../schemas/professional.schema.js';
+import { getTodayDateString, getNowTimeString, getTodayStartUTC } from '../utils/dateUtils.js';
 
 const professionalRoute: FastifyPluginAsync = async (fastify) => {
 
@@ -22,12 +23,11 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
   };
 
   const getProfessionalIdsWithFutureSlots = async (): Promise<Set<string>> => {
-    const now = new Date();
-    // Usar hora local para comparar com slots (horários do profissional são em hora local BR)
-    const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    // Data de hoje em UTC para query do Prisma (@db.Date é armazenado como UTC meia-noite)
-    const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-    const todayStr = toUTCDateStr(todayUTC);
+    // Usar timezone do Brasil para comparar com slots (horários do profissional são em hora local BR)
+    const nowHHMM = getNowTimeString();
+    // Data de hoje no Brasil em UTC para query do Prisma (@db.Date é armazenado como UTC meia-noite)
+    const todayUTC = getTodayStartUTC();
+    const todayStr = getTodayDateString();
 
     // Buscar todos os slots futuros disponíveis
     const futureSlots = await fastify.prisma.customAvailability.findMany({
@@ -273,9 +273,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       }
 
       // Construir filtros SQL dinâmicos
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const todayStr = getTodayDateString();
+      const nowHHMM = getNowTimeString();
 
       const conditions: string[] = [
         `u."userType" = 'PROFESSIONAL'`,
@@ -654,8 +653,7 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       const { startDate, endDate } = request.query;
 
       // Sempre filtrar datas passadas — nunca retornar disponibilidade de ontem
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
+      const today = getTodayStartUTC();
 
       const where: any = {
         professionalId,
