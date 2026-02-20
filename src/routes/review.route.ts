@@ -70,10 +70,17 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'You already reviewed this appointment' };
       }
 
-      // Determinar roles
+      // Determinar roles e destinatário
       const roleFrom: 'CLIENT' | 'PROFESSIONAL' = isClient ? 'CLIENT' : 'PROFESSIONAL';
       const roleTo: 'CLIENT' | 'PROFESSIONAL' = isClient ? 'PROFESSIONAL' : 'CLIENT';
-      const toUserId = data.toUserId || (isClient ? appointment.professionalId : appointment.clientId);
+      // SEMPRE usar o ID correto do appointment (ignorar data.toUserId para evitar self-review)
+      const toUserId = isClient ? appointment.professionalId : appointment.clientId;
+
+      // Guard: impedir self-review
+      if (toUserId === userId) {
+        reply.code(400);
+        return { error: 'You cannot review yourself' };
+      }
 
       // Criar avaliação
       const review = await fastify.prisma.review.create({
@@ -412,32 +419,53 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'User not found' };
       }
 
-      // Buscar todas as avaliações RECEBIDAS
-      const reviews = await fastify.prisma.review.findMany({
-        where: { toUserId: userId },
+      // Buscar avaliações RECEBIDAS filtradas por papel
+      // Se profissional, contar reviews onde roleTo=PROFESSIONAL
+      // Se cliente (ou query genérica), contar reviews onde roleTo=CLIENT
+      const isProfessional = user.userType === 'PROFESSIONAL';
+
+      // Stats como profissional
+      const proReviews = await fastify.prisma.review.findMany({
+        where: { toUserId: userId, roleTo: 'PROFESSIONAL' },
       });
 
-      if (reviews.length === 0) {
+      // Stats como cliente
+      const clientReviews = await fastify.prisma.review.findMany({
+        where: { toUserId: userId, roleTo: 'CLIENT' },
+      });
+
+      // Retornar stats do papel principal do usuário
+      const relevantReviews = isProfessional ? proReviews : clientReviews;
+
+      if (relevantReviews.length === 0) {
         return {
           userId,
           averageRating: 0,
           totalReviews: 0,
           ratingDistribution: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+          // Incluir stats do outro papel
+          ...(isProfessional ? {
+            clientRatingAvg: clientReviews.length > 0 ? Math.round(clientReviews.reduce((s, r) => s + r.rating, 0) / clientReviews.length * 10) / 10 : 0,
+            clientReviewCount: clientReviews.length,
+          } : {
+            professionalRatingAvg: proReviews.length > 0 ? Math.round(proReviews.reduce((s, r) => s + r.rating, 0) / proReviews.length * 10) / 10 : 0,
+            professionalReviewCount: proReviews.length,
+          }),
         };
       }
 
       // Calcular estatísticas
-      const totalReviews = reviews.length;
-      const sumRating = reviews.reduce((sum, r) => sum + r.rating, 0);
+      const totalReviews = relevantReviews.length;
+      const sumRating = relevantReviews.reduce((sum, r) => sum + r.rating, 0);
       const averageRating = sumRating / totalReviews;
 
       // Distribuição de ratings
       const ratingDistribution = {
-        '1': reviews.filter(r => r.rating === 1).length,
-        '2': reviews.filter(r => r.rating === 2).length,
-        '3': reviews.filter(r => r.rating === 3).length,
-        '4': reviews.filter(r => r.rating === 4).length,
-        '5': reviews.filter(r => r.rating === 5).length,
+        '1': relevantReviews.filter(r => r.rating === 1).length,
+        '2': relevantReviews.filter(r => r.rating === 2).length,
+        '3': relevantReviews.filter(r => r.rating === 3).length,
+        '4': relevantReviews.filter(r => r.rating === 4).length,
+        '5': relevantReviews.filter(r => r.rating === 5).length,
       };
 
       return {
@@ -445,6 +473,14 @@ const reviewRoute: FastifyPluginAsync = async (fastify) => {
         averageRating: Math.round(averageRating * 10) / 10,
         totalReviews,
         ratingDistribution,
+        // Incluir stats do outro papel
+        ...(isProfessional ? {
+          clientRatingAvg: clientReviews.length > 0 ? Math.round(clientReviews.reduce((s, r) => s + r.rating, 0) / clientReviews.length * 10) / 10 : 0,
+          clientReviewCount: clientReviews.length,
+        } : {
+          professionalRatingAvg: proReviews.length > 0 ? Math.round(proReviews.reduce((s, r) => s + r.rating, 0) / proReviews.length * 10) / 10 : 0,
+          professionalReviewCount: proReviews.length,
+        }),
       };
     }
   );
@@ -503,37 +539,43 @@ async function recalculateUserRating(fastify: any, userId: string) {
     select: { userType: true },
   });
 
-  // Buscar todas as avaliações RECEBIDAS por este usuário
-  const reviews = await fastify.prisma.review.findMany({
-    where: { toUserId: userId },
-    select: { rating: true },
-  });
-
-  if (reviews.length === 0) {
-    if (user?.userType === 'PROFESSIONAL') {
-      await fastify.prisma.professionalProfile.update({
-        where: { userId },
-        data: {
-          ratingAvg: 0,
-          reviewCount: 0,
-        },
-      });
-    }
-    return;
-  }
-
-  const avgRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length;
-  const totalReviews = reviews.length;
-
   if (user?.userType === 'PROFESSIONAL') {
+    // Profissional: contar apenas reviews onde roleTo = PROFESSIONAL
+    const reviews = await fastify.prisma.review.findMany({
+      where: { toUserId: userId, roleTo: 'PROFESSIONAL' },
+      select: { rating: true },
+    });
+
+    const avgRating = reviews.length > 0
+      ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
+      : 0;
+
     await fastify.prisma.professionalProfile.update({
       where: { userId },
       data: {
         ratingAvg: Math.round(avgRating * 10) / 10,
-        reviewCount: totalReviews,
+        reviewCount: reviews.length,
       },
     });
   }
+
+  // Atualizar rating como cliente (qualquer usuário pode receber review como cliente)
+  const clientReviews = await fastify.prisma.review.findMany({
+    where: { toUserId: userId, roleTo: 'CLIENT' },
+    select: { rating: true },
+  });
+
+  const clientAvg = clientReviews.length > 0
+    ? clientReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / clientReviews.length
+    : 0;
+
+  await fastify.prisma.user.update({
+    where: { id: userId },
+    data: {
+      clientRatingAvg: Math.round(clientAvg * 10) / 10,
+      clientReviewCount: clientReviews.length,
+    },
+  });
 }
 
 export default reviewRoute;
