@@ -219,19 +219,30 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         take: limit,
       });
 
-      return {
-        professionals: professionals.map(prof => {
+      // Buscar contagem real de serviços concluídos para cada profissional
+      const professionalsWithRealCount = await Promise.all(
+        professionals.map(async (prof) => {
+          const [realServicesCompleted, reviewAgg] = await Promise.all([
+            fastify.prisma.appointment.count({
+              where: { professionalId: prof.id, status: 'COMPLETED' },
+            }),
+            fastify.prisma.review.aggregate({
+              where: { toUserId: prof.id },
+              _avg: { rating: true },
+              _count: { id: true },
+            }),
+          ]);
           const defaultAddress = prof.addresses?.[0];
           const locationParts = [defaultAddress?.neighborhood, defaultAddress?.city, defaultAddress?.state].filter(Boolean);
           return {
             ...prof,
             specialty: prof.professionalProfile?.primaryCategory?.name || null,
             experience: prof.professionalProfile?.experienceRange || null,
-            servicesCompleted: prof.professionalProfile?.servicesCompleted ?? 0,
+            servicesCompleted: realServicesCompleted,
             available: prof.professionalProfile?.isAvailable ?? false,
             isVerified: prof.professionalProfile?.isVerified ?? false,
-            rating: prof.professionalProfile?.ratingAvg ?? 0,
-            reviewCount: prof.professionalProfile?.reviewCount ?? 0,
+            rating: reviewAgg._avg.rating ?? 0,
+            reviewCount: reviewAgg._count.id ?? 0,
             location: locationParts.length > 0 ? locationParts.join(', ') : null,
             latitude: prof.professionalProfile?.latitude ?? null,
             longitude: prof.professionalProfile?.longitude ?? null,
@@ -239,7 +250,11 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
             createdAt: prof.createdAt.toISOString(),
             updatedAt: prof.updatedAt.toISOString(),
           };
-        }),
+        })
+      );
+
+      return {
+        professionals: professionalsWithRealCount,
         total,
         page,
         limit,
@@ -360,8 +375,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           pp."service_radius_km" AS "serviceRadiusKm",
           pp."is_available" AS "isAvailable",
           pp."is_verified" AS "isVerified",
-          pp."rating_avg" AS "ratingAvg",
-          pp."review_count" AS "reviewCount",
+          COALESCE((SELECT AVG(r."rating") FROM reviews r WHERE r."to_user_id" = u."id"), 0) AS "ratingAvg",
+          (SELECT COUNT(*) FROM reviews r WHERE r."to_user_id" = u."id") AS "reviewCount",
           pp."services_completed" AS "servicesCompletedCached",
           (SELECT COUNT(*) FROM appointments a WHERE a."professional_id" = u."id" AND a."status" = 'COMPLETED') AS "servicesCompleted",
           pp."experience_range" AS "experienceRange",
@@ -496,10 +511,17 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       const defaultAddress = professional.addresses?.[0];
       const locationParts = [defaultAddress?.neighborhood, defaultAddress?.city, defaultAddress?.state].filter(Boolean);
 
-      // Contagem real de serviços concluídos (evita drift do counter)
-      const realServicesCompleted = await fastify.prisma.appointment.count({
-        where: { professionalId: professional.id, status: 'COMPLETED' },
-      });
+      // Contagem real de serviços e avaliações (evita drift dos counters cached)
+      const [realServicesCompleted, reviewAgg] = await Promise.all([
+        fastify.prisma.appointment.count({
+          where: { professionalId: professional.id, status: 'COMPLETED' },
+        }),
+        fastify.prisma.review.aggregate({
+          where: { toUserId: professional.id },
+          _avg: { rating: true },
+          _count: { id: true },
+        }),
+      ]);
 
       return {
         ...professional,
@@ -508,8 +530,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         servicesCompleted: realServicesCompleted,
         available: professional.professionalProfile?.isAvailable ?? false,
         isVerified: professional.professionalProfile?.isVerified ?? false,
-        rating: professional.professionalProfile?.ratingAvg ?? 0,
-        reviewCount: professional.professionalProfile?.reviewCount ?? 0,
+        rating: reviewAgg._avg.rating ?? 0,
+        reviewCount: reviewAgg._count.id ?? 0,
         location: locationParts.length > 0 ? locationParts.join(', ') : null,
         latitude: professional.professionalProfile?.latitude ?? null,
         longitude: professional.professionalProfile?.longitude ?? null,
