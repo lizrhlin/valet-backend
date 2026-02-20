@@ -14,6 +14,8 @@ const clientSelect = {
   email: true,
   phone: true,
   avatar: true,
+  clientRatingAvg: true,
+  clientReviewCount: true,
   createdAt: true,
 };
 
