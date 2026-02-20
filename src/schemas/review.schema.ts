@@ -15,7 +15,16 @@ export const createReviewSchema = z.object({
   appointmentId: idSchema,
   toUserId: idSchema, // Quem está sendo avaliado
   rating: ratingSchema,
-  comment: z.string().min(10, 'Comentário deve ter no mínimo 10 caracteres').max(1000, 'Comentário não pode exceder 1000 caracteres').optional(),
+  comment: z.string()
+    .transform(val => val.trim())
+    .pipe(
+      z.string()
+        .min(10, 'Comentário deve ter no mínimo 10 caracteres ou ser omitido')
+        .max(1000, 'Comentário não pode exceder 1000 caracteres')
+    )
+    .optional()
+    .or(z.literal(''))
+    .transform(val => (val === '' || !val ? undefined : val)), // Vazio → undefined
 });
 
 // ============================================
@@ -24,7 +33,16 @@ export const createReviewSchema = z.object({
 
 export const updateReviewSchema = z.object({
   rating: ratingSchema.optional(),
-  comment: z.string().min(10).max(1000).optional(),
+  comment: z.string()
+    .transform(val => val.trim())
+    .pipe(
+      z.string()
+        .min(10, 'Comentário deve ter no mínimo 10 caracteres ou ser omitido')
+        .max(1000, 'Comentário não pode exceder 1000 caracteres')
+    )
+    .optional()
+    .or(z.literal(''))
+    .transform(val => (val === '' || !val ? undefined : val)),
 });
 
 // ============================================
