@@ -129,6 +129,27 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         };
       }
 
+      // Verificar se o horário está na disponibilidade do profissional
+      const [slotYear, slotMonth, slotDay] = dateStr.split('-').map(Number);
+      const slotDateUTC = new Date(Date.UTC(slotYear, slotMonth - 1, slotDay, 12, 0, 0));
+
+      const availableSlot = await fastify.prisma.customAvailability.findFirst({
+        where: {
+          professionalId: professionalProfile.id,
+          date: slotDateUTC,
+          timeSlot: data.scheduledTime,
+          isAvailable: true,
+        },
+      });
+
+      if (!availableSlot) {
+        reply.code(409);
+        return {
+          error: 'SLOT_NOT_AVAILABLE',
+          message: 'Este horário não está disponível. O profissional pode ter alterado a agenda.',
+        };
+      }
+
       // Gerar número único
       const orderNumber = `LIZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
 

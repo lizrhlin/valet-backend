@@ -758,13 +758,22 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         where: { professionalId },
       });
 
-      // Criar novas disponibilidades
-      const customAvailabilityData = schedules.flatMap(schedule => {
+      // Filtrar datas passadas e horários passados do dia atual
+      const todayStr = getTodayDateString();
+      const nowTime = getNowTimeString();
+      const validSchedules = schedules.filter(s => s.date >= todayStr);
+
+      const customAvailabilityData = validSchedules.flatMap(schedule => {
         // Garantir que a data seja interpretada como UTC meio-dia para evitar problemas de timezone
         const [year, month, day] = schedule.date.split('-').map(Number);
         const dateUTC = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+        // Filtrar horários que já passaram no dia de hoje
+        const validSlots = schedule.date === todayStr
+          ? schedule.timeSlots.filter(slot => slot > nowTime)
+          : schedule.timeSlots;
         
-        return schedule.timeSlots.map(timeSlot => ({
+        return validSlots.map(timeSlot => ({
           professionalId,
           date: dateUTC,
           timeSlot,
