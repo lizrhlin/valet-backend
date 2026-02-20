@@ -362,7 +362,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
           pp."is_verified" AS "isVerified",
           pp."rating_avg" AS "ratingAvg",
           pp."review_count" AS "reviewCount",
-          pp."services_completed" AS "servicesCompleted",
+          pp."services_completed" AS "servicesCompletedCached",
+          (SELECT COUNT(*) FROM appointments a WHERE a."professional_id" = u."id" AND a."status" = 'COMPLETED') AS "servicesCompleted",
           pp."experience_range" AS "experienceRange",
           pp."primary_category_id" AS "primaryCategoryId",
           ROUND(earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2))::numeric, 0) AS "distanceMeters",
@@ -495,11 +496,16 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       const defaultAddress = professional.addresses?.[0];
       const locationParts = [defaultAddress?.neighborhood, defaultAddress?.city, defaultAddress?.state].filter(Boolean);
 
+      // Contagem real de serviços concluídos (evita drift do counter)
+      const realServicesCompleted = await fastify.prisma.appointment.count({
+        where: { professionalId: professional.id, status: 'COMPLETED' },
+      });
+
       return {
         ...professional,
         specialty: professional.professionalProfile?.primaryCategory?.name || null,
         experience: professional.professionalProfile?.experienceRange || null,
-        servicesCompleted: professional.professionalProfile?.servicesCompleted ?? 0,
+        servicesCompleted: realServicesCompleted,
         available: professional.professionalProfile?.isAvailable ?? false,
         isVerified: professional.professionalProfile?.isVerified ?? false,
         rating: professional.professionalProfile?.ratingAvg ?? 0,
