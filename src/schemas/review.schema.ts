@@ -13,7 +13,7 @@ export const reviewRoleSchema = z.enum(['CLIENT', 'PROFESSIONAL']);
 
 export const createReviewSchema = z.object({
   appointmentId: idSchema,
-  toUserId: idSchema, // Quem está sendo avaliado
+  toUserId: idSchema.optional(), // Backend ignora e calcula a partir do appointment
   rating: ratingSchema,
   comment: z.string()
     .transform(val => val.trim())
@@ -25,24 +25,6 @@ export const createReviewSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform(val => (val === '' || !val ? undefined : val)), // Vazio → undefined
-});
-
-// ============================================
-// ATUALIZAR AVALIAÇÃO
-// ============================================
-
-export const updateReviewSchema = z.object({
-  rating: ratingSchema.optional(),
-  comment: z.string()
-    .transform(val => val.trim())
-    .pipe(
-      z.string()
-        .min(10, 'Comentário deve ter no mínimo 10 caracteres ou ser omitido')
-        .max(1000, 'Comentário não pode exceder 1000 caracteres')
-    )
-    .optional()
-    .or(z.literal(''))
-    .transform(val => (val === '' || !val ? undefined : val)),
 });
 
 // ============================================
@@ -66,8 +48,14 @@ export const reviewIdParamSchema = z.object({
   reviewId: idSchema,
 });
 
+// Usado por /reviews/professional/:professionalId
 export const professionalReviewsParamSchema = z.object({
-  userId: idSchema, // ID do usuário (pode ser professional ou client)
+  professionalId: idSchema,
+});
+
+// Usado por /reviews/user/:userId/stats
+export const userStatsParamSchema = z.object({
+  userId: idSchema,
 });
 
 // ============================================
@@ -122,7 +110,6 @@ export const professionalRatingStatsSchema = z.object({
 // ============================================
 
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;
-export type UpdateReviewInput = z.infer<typeof updateReviewSchema>;
 export type GetReviewsQuery = z.infer<typeof getReviewsQuerySchema>;
 export type ReviewResponse = z.infer<typeof reviewResponseSchema>;
 export type ProfessionalRatingStats = z.infer<typeof professionalRatingStatsSchema>;
