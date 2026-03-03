@@ -80,13 +80,13 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!professionalProfile) {
         reply.code(404);
-        return { error: 'Professional not found' };
+        return { error: 'PROFESSIONAL_NOT_FOUND', message: 'Profissional não encontrado.' };
       }
 
       // Verificar se oferece esse serviço
       if (professionalProfile.subcategories.length === 0) {
         reply.code(400);
-        return { error: 'Professional does not offer this service' };
+        return { error: 'SERVICE_NOT_OFFERED', message: 'Este profissional não oferece mais este serviço.' };
       }
 
       const servicePrice = professionalProfile.subcategories[0];
@@ -99,7 +99,7 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
       
       if (!address) {
         reply.code(404);
-        return { error: 'Address not found' };
+        return { error: 'ADDRESS_NOT_FOUND', message: 'Endereço não encontrado. Cadastre um endereço antes de agendar.' };
       }
 
       // Verificar se o endereço possui coordenadas (obrigatório para agendamento)
@@ -334,13 +334,13 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       // Verificar acesso
       if (appointment.clientId !== userId && appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Access denied' };
+        return { error: 'ACCESS_DENIED', message: 'Você não tem permissão para acessar este agendamento.' };
       }
 
       return {
@@ -378,18 +378,18 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       // Cliente ou profissional podem cancelar
       if (appointment.clientId !== userId && appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Access denied' };
+        return { error: 'ACCESS_DENIED', message: 'Você não tem permissão para cancelar este agendamento.' };
       }
 
       if (appointment.status === 'COMPLETED' || appointment.status === 'CANCELLED') {
         reply.code(400);
-        return { error: 'Cannot cancel this appointment' };
+        return { error: 'CANNOT_CANCEL', message: 'Este agendamento não pode mais ser cancelado.' };
       }
 
       const updated = await fastify.prisma.appointment.update({
@@ -440,17 +440,17 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       if (appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Only the professional can confirm' };
+        return { error: 'ACCESS_DENIED', message: 'Apenas o profissional pode confirmar este agendamento.' };
       }
 
       if (appointment.status !== 'PENDING') {
         reply.code(400);
-        return { error: 'Only pending appointments can be confirmed' };
+        return { error: 'INVALID_STATUS', message: 'Apenas agendamentos pendentes podem ser confirmados.' };
       }
 
       const updated = await fastify.prisma.appointment.update({
@@ -500,17 +500,17 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       if (appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Only the professional can complete' };
+        return { error: 'ACCESS_DENIED', message: 'Apenas o profissional pode finalizar este serviço.' };
       }
 
       if (appointment.status !== 'IN_PROGRESS') {
         reply.code(400);
-        return { error: 'Only in-progress appointments can be completed' };
+        return { error: 'INVALID_STATUS', message: 'Apenas serviços em andamento podem ser finalizados.' };
       }
 
       const updated = await fastify.prisma.appointment.update({
@@ -566,17 +566,17 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       if (appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Only the professional can update status' };
+        return { error: 'ACCESS_DENIED', message: 'Apenas o profissional pode atualizar o status.' };
       }
 
       if (appointment.status !== 'CONFIRMED') {
         reply.code(400);
-        return { error: 'Only confirmed appointments can be marked as on way' };
+        return { error: 'INVALID_STATUS', message: 'Apenas agendamentos confirmados podem ser marcados como a caminho.' };
       }
 
       const updated = await fastify.prisma.appointment.update({
@@ -625,17 +625,17 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       if (appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Only the professional can start service' };
+        return { error: 'ACCESS_DENIED', message: 'Apenas o profissional pode iniciar o serviço.' };
       }
 
       if (appointment.status !== 'ON_WAY' && appointment.status !== 'CONFIRMED') {
         reply.code(400);
-        return { error: 'Cannot start service from current status' };
+        return { error: 'INVALID_STATUS', message: 'Não é possível iniciar o serviço com o status atual.' };
       }
 
       const updated = await fastify.prisma.appointment.update({
@@ -689,17 +689,17 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (!appointment) {
         reply.code(404);
-        return { error: 'Appointment not found' };
+        return { error: 'APPOINTMENT_NOT_FOUND', message: 'Agendamento não encontrado.' };
       }
 
       if (appointment.professionalId !== userId) {
         reply.code(403);
-        return { error: 'Only the professional can reject' };
+        return { error: 'ACCESS_DENIED', message: 'Apenas o profissional pode rejeitar este agendamento.' };
       }
 
       if (appointment.status !== 'PENDING') {
         reply.code(400);
-        return { error: 'Only pending appointments can be rejected' };
+        return { error: 'INVALID_STATUS', message: 'Apenas agendamentos pendentes podem ser rejeitados.' };
       }
 
       const updated = await fastify.prisma.appointment.update({
