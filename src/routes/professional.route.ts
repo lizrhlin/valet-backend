@@ -633,6 +633,44 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      // Sincronizar professional_categories com base nas subcategorias ativas
+      const activeSubcategories = await fastify.prisma.professionalSubcategory.findMany({
+        where: { professionalId },
+        include: { subcategory: { select: { categoryId: true } } },
+      });
+
+      const activeCategoryIds = [
+        ...new Set(activeSubcategories.map(s => s.subcategory.categoryId)),
+      ];
+
+      // Remover categorias que o profissional não tem mais subcategorias
+      await fastify.prisma.professionalCategory.deleteMany({
+        where: {
+          professionalId,
+          categoryId: { notIn: activeCategoryIds },
+        },
+      });
+
+      // Criar categorias que ainda não existem
+      const existingCategories = await fastify.prisma.professionalCategory.findMany({
+        where: { professionalId },
+        select: { categoryId: true },
+      });
+      const existingCategoryIds = existingCategories.map(c => c.categoryId);
+
+      const categoriesToCreate = activeCategoryIds.filter(
+        id => !existingCategoryIds.includes(id)
+      );
+
+      if (categoriesToCreate.length > 0) {
+        await fastify.prisma.professionalCategory.createMany({
+          data: categoriesToCreate.map(categoryId => ({
+            professionalId,
+            categoryId,
+          })),
+        });
+      }
+
       // Buscar subcategorias atualizadas para retornar
       const updatedSubcategories = await fastify.prisma.professionalSubcategory.findMany({
         where: { professionalId },
