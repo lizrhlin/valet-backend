@@ -471,6 +471,9 @@ model Notification {
   
   isRead  Boolean          @default(false)
   
+  // Soft delete: quando o usuário "exclui" a notificação
+  hiddenAt DateTime?        @map("hidden_at")
+  
   createdAt DateTime @default(now())
 
   @@map("notifications")
@@ -479,6 +482,7 @@ model Notification {
   @@index([type])
   @@index([createdAt])
   @@index([appointmentId])
+  @@index([hiddenAt])
 }
 
 // ============================================

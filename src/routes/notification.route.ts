@@ -25,7 +25,7 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
       const { type, isRead, page = 1, limit = 20 } = request.query as z.infer<typeof getNotificationsQuerySchema>;
 
-      const where: any = { userId };
+      const where: any = { userId, hiddenAt: null };
       if (type) where.type = type;
       if (isRead !== undefined) where.isRead = isRead;
 
@@ -182,7 +182,7 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
       const type = (request.body as any)?.type;
 
-      const where: any = { userId, isRead: false };
+      const where: any = { userId, isRead: false, hiddenAt: null };
       if (type) where.type = type;
 
       const result = await fastify.prisma.notification.updateMany({
@@ -222,31 +222,33 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'Access denied' };
       }
 
-      await fastify.prisma.notification.delete({
+      await fastify.prisma.notification.update({
         where: { id: notificationId },
+        data: { hiddenAt: new Date() },
       });
 
-      return { message: 'Notification deleted successfully' };
+      return { message: 'Notification hidden successfully' };
     }
   );
 
-  // Deletar todas as notificações lidas
+  // Ocultar todas as notificações (soft delete)
   fastify.delete(
     '/notifications/clear-read',
     {
       schema: {
         tags: ['notifications'],
-        description: 'Delete all read notifications',
+        description: 'Hide all notifications (soft delete)',
       },
     },
     async (request) => {
       const userId = request.user.userId;
 
-      const result = await fastify.prisma.notification.deleteMany({
-        where: { userId, isRead: true },
+      const result = await fastify.prisma.notification.updateMany({
+        where: { userId, hiddenAt: null },
+        data: { hiddenAt: new Date() },
       });
 
-      return { message: `Deleted ${result.count} notifications` };
+      return { message: `${result.count} notificações removidas` };
     }
   );
 
@@ -263,7 +265,7 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
 
       const count = await fastify.prisma.notification.count({
-        where: { userId, isRead: false },
+        where: { userId, isRead: false, hiddenAt: null },
       });
 
       return { count };
@@ -283,11 +285,11 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
 
       const [total, unread, byType] = await Promise.all([
-        fastify.prisma.notification.count({ where: { userId } }),
-        fastify.prisma.notification.count({ where: { userId, isRead: false } }),
+        fastify.prisma.notification.count({ where: { userId, hiddenAt: null } }),
+        fastify.prisma.notification.count({ where: { userId, isRead: false, hiddenAt: null } }),
         fastify.prisma.notification.groupBy({
           by: ['type'],
-          where: { userId },
+          where: { userId, hiddenAt: null },
           _count: { type: true },
         }),
       ]);
@@ -331,7 +333,7 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
       const { limit = 20 } = request.query as { limit?: number };
 
       const notifications = await fastify.prisma.notification.findMany({
-        where: { userId, isRead: false },
+        where: { userId, isRead: false, hiddenAt: null },
         take: limit,
         orderBy: { createdAt: 'desc' },
       });
