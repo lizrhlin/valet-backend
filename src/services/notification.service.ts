@@ -20,9 +20,21 @@ export class NotificationService {
 
   /**
    * Cria uma notificação no banco de dados.
+   * Respeita a preferência notificationsEnabled do usuário.
    * No futuro (Fase 2), também enviará push notification.
    */
   async create(params: CreateNotificationParams) {
+    // Verificar se o usuário habilitou notificações
+    const user = await this.prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { notificationsEnabled: true },
+    });
+
+    if (user && !user.notificationsEnabled) {
+      // Usuário desabilitou notificações — não criar
+      return null;
+    }
+
     const notification = await this.prisma.notification.create({
       data: {
         userId: params.userId,

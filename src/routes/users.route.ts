@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { userResponseSchema, updateProfileSchema, UpdateProfileInput } from '../schemas/user.schema.js';
+import { userResponseSchema, updateProfileSchema, updatePreferencesSchema, UpdateProfileInput } from '../schemas/user.schema.js';
 import { authenticate } from '../utils/auth.js';
 
 const usersRoute: FastifyPluginAsync = async (fastify) => {
@@ -123,6 +123,68 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
         reply.code(400);
         return { error: error instanceof Error ? error.message : 'Update failed' };
       }
+    }
+  );
+
+  // Update user preferences (notifications, language)
+  fastify.patch(
+    '/me/preferences',
+    {
+      onRequest: [authenticate],
+      schema: {
+        tags: ['users'],
+        description: 'Update user preferences (notifications, language)',
+        security: [{ bearerAuth: [] }],
+        body: updatePreferencesSchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user.userId;
+      const data = request.body as z.infer<typeof updatePreferencesSchema>;
+
+      try {
+        const updatedUser = await fastify.prisma.user.update({
+          where: { id: userId },
+          data,
+          select: {
+            id: true,
+            notificationsEnabled: true,
+            language: true,
+          },
+        });
+
+        return updatedUser;
+      } catch (error) {
+        reply.code(400);
+        return { error: error instanceof Error ? error.message : 'Erro ao atualizar preferências' };
+      }
+    }
+  );
+
+  // Get user preferences
+  fastify.get(
+    '/me/preferences',
+    {
+      onRequest: [authenticate],
+      schema: {
+        tags: ['users'],
+        description: 'Get user preferences',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+    async (request) => {
+      const userId = request.user.userId;
+
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          notificationsEnabled: true,
+          language: true,
+        },
+      });
+
+      return user || { notificationsEnabled: true, language: 'pt-BR' };
     }
   );
 };
