@@ -177,6 +177,7 @@ export const userResponseSchema = z.object({
   email: z.string().email(),
   phone: z.string().nullable().optional(),
   avatar: z.string().nullable().optional(),
+  cpf: z.string().nullable().optional(),
   userType: userTypeSchema,
   status: userStatusSchema,
   notificationsEnabled: z.boolean(),
