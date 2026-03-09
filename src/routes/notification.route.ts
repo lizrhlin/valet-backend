@@ -176,14 +176,11 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ['notifications'],
         description: 'Mark all notifications as read',
-        body: z.object({
-          type: z.enum(['INFO', 'SUCCESS', 'WARNING', 'ERROR', 'BOOKING', 'REVIEW', 'SYSTEM']).optional(),
-        }),
       },
     },
     async (request) => {
       const userId = request.user.userId;
-      const { type } = request.body as { type?: string };
+      const type = (request.body as any)?.type;
 
       const where: any = { userId, isRead: false };
       if (type) where.type = type;
