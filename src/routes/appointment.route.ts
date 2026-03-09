@@ -7,6 +7,7 @@ import {
 } from '../schemas/appointment.schema.js';
 import { authenticate } from '../utils/auth.js';
 import { NotificationService } from '../services/notification.service.js';
+import { brazilDateTimeToUTC, dateStringToStartUTC, dateStringToEndUTC } from '../utils/dateUtils.js';
 
 // Helper para incluir dados completos do cliente
 const clientSelect = {
@@ -57,9 +58,9 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       // Validar que o horário não é no passado
       // Combina scheduledDate + scheduledTime para comparar com o momento atual
-      // O horário do slot (scheduledTime) é em BRT, então criamos a data no timezone do Brasil
+      // Converte o horário BRT para UTC usando o offset real do Brasil
       const dateStr = data.scheduledDate.split('T')[0]; // "YYYY-MM-DD"
-      const scheduledDateTime = new Date(`${dateStr}T${data.scheduledTime}:00-03:00`);
+      const scheduledDateTime = brazilDateTimeToUTC(dateStr, data.scheduledTime);
 
       if (scheduledDateTime.getTime() <= Date.now()) {
         reply.code(400);
@@ -230,6 +231,9 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const userId = request.user.userId;
       const { status, page = 1, limit = 20 } = request.query as z.infer<typeof getAppointmentsQuerySchema>;
+      
+      // Suporte a filtro por scheduledDate (query param extra)
+      const scheduledDate = (request.query as any).scheduledDate as string | undefined;
 
       const where: any = {
         OR: [
@@ -240,6 +244,15 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
 
       if (status) {
         where.status = status;
+      }
+      
+      // Filtrar por data específica (usado por getTodayAppointments)
+      if (scheduledDate) {
+        const dateOnly = scheduledDate.split('T')[0];
+        where.scheduledDate = {
+          gte: dateStringToStartUTC(dateOnly),
+          lte: dateStringToEndUTC(dateOnly),
+        };
       }
 
       const skip = (page - 1) * limit;
