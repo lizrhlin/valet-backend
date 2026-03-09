@@ -171,7 +171,7 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         },
         include: {
           client: { select: clientSelect },
-          professional: { select: clientSelect },
+          professional: { select: professionalSelect },
           subcategory: { include: { category: true } },
           address: true,
         },
@@ -252,7 +252,7 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           orderBy: { scheduledDate: 'desc' },
           include: {
             client: { select: clientSelect },
-            professional: { select: clientSelect },
+            professional: { select: professionalSelect },
             subcategory: { include: { category: true } },
             address: true,
           },
