@@ -6,6 +6,7 @@ import {
   appointmentIdParamSchema,
 } from '../schemas/appointment.schema.js';
 import { authenticate } from '../utils/auth.js';
+import { NotificationService } from '../services/notification.service.js';
 
 // Helper para incluir dados completos do cliente
 const clientSelect = {
@@ -183,6 +184,20 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           status: 'COMPLETED'
         },
       });
+
+      // 🔔 Notificar profissional sobre novo agendamento
+      const notificationService = new NotificationService(fastify.prisma);
+      try {
+        await notificationService.onAppointmentCreated(
+          appointment.id,
+          appointment.professionalId,
+          appointment.client?.name || 'Cliente',
+          appointment.subcategory?.name || 'Serviço',
+        );
+      } catch (e) {
+        // Não bloqueia a criação do agendamento se a notificação falhar
+        fastify.log.error(e, 'Erro ao criar notificação de agendamento');
+      }
 
       reply.code(201);
       return {
@@ -407,6 +422,24 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         },
       });
 
+      // 🔔 Notificar a outra parte sobre o cancelamento
+      const notifService = new NotificationService(fastify.prisma);
+      try {
+        const isClientCancelling = userId === appointment.clientId;
+        const recipientId = isClientCancelling ? appointment.professionalId : appointment.clientId;
+        const cancellerName = isClientCancelling
+          ? (updated.client?.name || 'Cliente')
+          : (updated.professional?.name || 'Profissional');
+        await notifService.onAppointmentCancelled(
+          appointmentId,
+          recipientId,
+          cancellerName,
+          updated.subcategory?.name || 'Serviço',
+        );
+      } catch (e) {
+        fastify.log.error(e, 'Erro ao criar notificação de cancelamento');
+      }
+
       return {
         ...updated,
         createdAt: updated.createdAt.toISOString(),
@@ -466,6 +499,19 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           address: true,
         },
       });
+
+      // 🔔 Notificar cliente que o agendamento foi aceito
+      const notifService = new NotificationService(fastify.prisma);
+      try {
+        await notifService.onAppointmentAccepted(
+          appointmentId,
+          appointment.clientId,
+          updated.professional?.name || 'Profissional',
+          updated.subcategory?.name || 'Serviço',
+        );
+      } catch (e) {
+        fastify.log.error(e, 'Erro ao criar notificação de aceite');
+      }
 
       return {
         ...updated,
@@ -533,6 +579,20 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
         data: { servicesCompleted: { increment: 1 } },
       });
 
+      // 🔔 Notificar cliente e profissional sobre conclusão
+      const notifService = new NotificationService(fastify.prisma);
+      try {
+        await notifService.onAppointmentCompleted(
+          appointmentId,
+          appointment.clientId,
+          appointment.professionalId,
+          updated.professional?.name || 'Profissional',
+          updated.subcategory?.name || 'Serviço',
+        );
+      } catch (e) {
+        fastify.log.error(e, 'Erro ao criar notificação de conclusão');
+      }
+
       return {
         ...updated,
         createdAt: updated.createdAt.toISOString(),
@@ -591,6 +651,19 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           address: true,
         },
       });
+
+      // Notificar o cliente que o profissional está a caminho
+      try {
+        const notifService = new NotificationService(fastify.prisma);
+        await notifService.onAppointmentOnWay(
+          appointmentId,
+          appointment.clientId,
+          updated.professional?.name || 'Profissional',
+          updated.subcategory?.name || 'serviço',
+        );
+      } catch (e) {
+        request.log.error(e, 'Falha ao criar notificação de a caminho');
+      }
 
       return {
         ...updated,
@@ -651,6 +724,19 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           address: true,
         },
       });
+
+      // Notificar o cliente que o serviço foi iniciado
+      try {
+        const notifService = new NotificationService(fastify.prisma);
+        await notifService.onAppointmentStarted(
+          appointmentId,
+          appointment.clientId,
+          updated.professional?.name || 'Profissional',
+          updated.subcategory?.name || 'serviço',
+        );
+      } catch (e) {
+        request.log.error(e, 'Falha ao criar notificação de serviço iniciado');
+      }
 
       return {
         ...updated,
@@ -716,6 +802,19 @@ const appointmentRoute: FastifyPluginAsync = async (fastify) => {
           address: true,
         },
       });
+
+      // 🔔 Notificar cliente que o agendamento foi recusado
+      const notifService = new NotificationService(fastify.prisma);
+      try {
+        await notifService.onAppointmentRejected(
+          appointmentId,
+          appointment.clientId,
+          updated.professional?.name || 'Profissional',
+          updated.subcategory?.name || 'Serviço',
+        );
+      } catch (e) {
+        fastify.log.error(e, 'Erro ao criar notificação de rejeição');
+      }
 
       return {
         ...updated,

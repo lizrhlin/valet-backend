@@ -55,9 +55,16 @@ enum NotificationType {
   SUCCESS
   WARNING
   ERROR
-  BOOKING    // Notificações de agendamento
-  REVIEW     // Notificações de avaliações
-  SYSTEM     // Notificações do sistema
+  BOOKING                  // Notificações de agendamento (genérico)
+  REVIEW                   // Notificações de avaliações
+  SYSTEM                   // Notificações do sistema
+  APPOINTMENT_CREATED      // Novo agendamento
+  APPOINTMENT_ACCEPTED     // Agendamento aceito
+  APPOINTMENT_REJECTED     // Agendamento recusado
+  APPOINTMENT_CANCELLED    // Agendamento cancelado
+  APPOINTMENT_ON_WAY       // Profissional a caminho
+  APPOINTMENT_STARTED      // Serviço iniciado
+  APPOINTMENT_COMPLETED    // Serviço concluído
 }
 
 enum ReviewRole {
@@ -456,6 +463,9 @@ model Notification {
   title   String
   message String           @db.Text
   
+  // Referência ao agendamento (opcional)
+  appointmentId String?    @map("appointment_id")
+  
   // Dados adicionais em JSON
   data    Json?
   
@@ -468,6 +478,7 @@ model Notification {
   @@index([isRead])
   @@index([type])
   @@index([createdAt])
+  @@index([appointmentId])
 }
 
 // ============================================

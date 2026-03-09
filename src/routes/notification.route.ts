@@ -253,6 +253,26 @@ const notificationRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Contagem de notificações não lidas (para badge)
+  fastify.get(
+    '/notifications/unread-count',
+    {
+      schema: {
+        tags: ['notifications'],
+        description: 'Get unread notification count for badge',
+      },
+    },
+    async (request) => {
+      const userId = request.user.userId;
+
+      const count = await fastify.prisma.notification.count({
+        where: { userId, isRead: false },
+      });
+
+      return { count };
+    }
+  );
+
   // Obter estatísticas de notificações
   fastify.get(
     '/notifications/stats',
