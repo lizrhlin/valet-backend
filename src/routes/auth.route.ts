@@ -45,6 +45,47 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Verificar disponibilidade de CPF
+  fastify.post(
+    '/check-cpf',
+    {
+      schema: {
+        tags: ['auth'],
+        description: 'Check if CPF is already registered for a given user type',
+        body: z.object({
+          cpf: z.string().min(11, 'CPF inválido'),
+          userType: z.enum(['CLIENT', 'PROFESSIONAL']),
+        }),
+        response: {
+          200: z.object({
+            available: z.boolean(),
+            message: z.string().optional(),
+          }),
+        },
+      },
+    },
+    async (request, _reply) => {
+      const { cpf, userType } = request.body as { cpf: string; userType: 'CLIENT' | 'PROFESSIONAL' };
+
+      // Limpar formatação do CPF (ex: 032.000.360-44 → 03200036044)
+      const cleanedCpf = cpf.replace(/\D/g, '');
+
+      const existingUser = await fastify.prisma.user.findFirst({
+        where: { cpf: cleanedCpf, userType },
+      });
+
+      if (existingUser) {
+        const label = userType === 'CLIENT' ? 'cliente' : 'profissional';
+        return {
+          available: false,
+          message: `Este CPF já está cadastrado como ${label}.`,
+        };
+      }
+
+      return { available: true };
+    }
+  );
+
   // Login
   fastify.post<{
     Body: LoginInput;
