@@ -61,13 +61,14 @@ export const cepSchema = z
   .string()
   .regex(/^\d{5}-?\d{3}$/, 'CEP inválido');
 
-// Senha forte
+// Senha forte — regex consolidada para paridade front/back
 export const passwordSchema = z
   .string()
-  .min(8, 'Senha deve ter no mínimo 8 caracteres')
-  .regex(/[A-Z]/, 'Senha deve conter pelo menos uma letra maiúscula')
-  .regex(/[a-z]/, 'Senha deve conter pelo menos uma letra minúscula')
-  .regex(/[0-9]/, 'Senha deve conter pelo menos um número');
+  .min(1, 'Senha é obrigatória')
+  .regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/,
+    'Mínimo 8 caracteres, com letra maiúscula, minúscula e número',
+  );
 
 // Data futura
 export const futureDateSchema = z
