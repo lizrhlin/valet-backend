@@ -86,6 +86,53 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // Verificar disponibilidade de email por userType
+  fastify.post(
+    '/check-email',
+    {
+      schema: {
+        tags: ['auth'],
+        description: 'Check if email is already registered for a given user type (excludes current user if userId provided)',
+        body: z.object({
+          email: z.string().email('Email inválido'),
+          userType: z.enum(['CLIENT', 'PROFESSIONAL']),
+          excludeUserId: z.string().optional(),
+        }),
+        response: {
+          200: z.object({
+            available: z.boolean(),
+            message: z.string().optional(),
+          }),
+        },
+      },
+    },
+    async (request, _reply) => {
+      const { email, userType, excludeUserId } = request.body as {
+        email: string;
+        userType: 'CLIENT' | 'PROFESSIONAL';
+        excludeUserId?: string;
+      };
+
+      const existingUser = await fastify.prisma.user.findFirst({
+        where: {
+          email: email.toLowerCase().trim(),
+          userType,
+          ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+        },
+      });
+
+      if (existingUser) {
+        const label = userType === 'CLIENT' ? 'cliente' : 'profissional';
+        return {
+          available: false,
+          message: `Este email já está cadastrado como ${label}.`,
+        };
+      }
+
+      return { available: true };
+    }
+  );
+
   // Login
   fastify.post<{
     Body: LoginInput;

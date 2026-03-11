@@ -126,6 +126,25 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.userId;
 
       try {
+        // Validar unicidade de email por userType
+        if (request.body.email) {
+          const currentUser = await fastify.prisma.user.findUnique({ where: { id: userId }, select: { userType: true } });
+          if (currentUser) {
+            const emailConflict = await fastify.prisma.user.findFirst({
+              where: {
+                email: request.body.email.toLowerCase().trim(),
+                userType: currentUser.userType,
+                id: { not: userId },
+              },
+            });
+            if (emailConflict) {
+              const label = currentUser.userType === 'CLIENT' ? 'cliente' : 'profissional';
+              reply.code(400);
+              return { error: `Este email já está cadastrado como ${label}.` };
+            }
+          }
+        }
+
         const updatedUser = await fastify.prisma.user.update({
           where: { id: userId },
           data: request.body,
