@@ -486,13 +486,13 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         });
 
         if (!user) {
-          reply.code(401);
+          reply.code(404);
           return { message: 'Usuário não encontrado' };
         }
 
         const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
         if (!isCurrentPasswordValid) {
-          reply.code(401);
+          reply.code(400);
           return { message: 'Senha atual incorreta' };
         }
 
