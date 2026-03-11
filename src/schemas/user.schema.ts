@@ -131,7 +131,8 @@ export const refreshTokenSchema = z.object({
 
 export const updateProfileSchema = z.object({
   name: z.string().min(3).optional(),
-  phone: phoneSchema,
+  email: emailSchema.optional(),
+  phone: z.string().min(10, 'Telefone deve ter no mínimo 10 dígitos').optional(),
   avatar: z.string().url().optional(),
 });
 
