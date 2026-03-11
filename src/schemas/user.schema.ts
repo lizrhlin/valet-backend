@@ -182,6 +182,9 @@ export const userResponseSchema = z.object({
   status: userStatusSchema,
   notificationsEnabled: z.boolean(),
   language: z.string(),
+  // Campos de verificação do profissional (achatados para facilitar no frontend)
+  isVerified: z.boolean().optional(),
+  onboardingStatus: z.enum(['DRAFT', 'SUBMITTED', 'VERIFIED', 'REJECTED']).nullable().optional(),
   professionalProfile: z.object({
     id: idSchema,
     primaryCategoryId: z.number().nullable().optional(),

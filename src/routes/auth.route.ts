@@ -306,6 +306,8 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
         const resolvedExperienceRange = experienceRange || experience || null;
 
         // Atualizar dados do profissional (perfil)
+        // isVerified=false até aprovação manual da equipe
+        // onboardingStatus=SUBMITTED indica cadastro concluído, aguardando revisão
         await fastify.prisma.professionalProfile.upsert({
           where: { userId },
           update: {
@@ -314,6 +316,7 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
             latitude,
             longitude,
             serviceRadiusKm: serviceRadiusKm ?? 10,
+            onboardingStatus: 'SUBMITTED',
           },
           create: {
             userId,
@@ -324,14 +327,12 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
             serviceRadiusKm: serviceRadiusKm ?? 10,
             isAvailable: false,
             isVerified: false,
+            onboardingStatus: 'SUBMITTED',
           },
         });
 
-        // Ativar usuário após completar registro
-        await fastify.prisma.user.update({
-          where: { id: userId },
-          data: { status: 'ACTIVE' },
-        });
+        // users.status já é ACTIVE desde o registro inicial
+        // Visibilidade pública controlada por isVerified/onboardingStatus
 
         // Extrair categorias únicas dos serviços
         const subcategoryIds = services.map(s => s.subcategoryId);

@@ -368,6 +368,194 @@ const documentRoute: FastifyPluginAsync = async (fastify) => {
       return null;
     }
   );
+
+  // ============================================
+  // ADMIN — Aprovação / Rejeição de profissionais
+  // ============================================
+
+  // POST /documents/admin/approve-professional/:userId
+  // Aprova todos os documentos do profissional e marca isVerified=true
+  fastify.post<{
+    Params: { userId: string };
+  }>(
+    "/documents/admin/approve-professional/:userId",
+    {
+      schema: {
+        tags: ["documents", "admin"],
+        description: "Approve a professional (mark verified, approve all documents)",
+        params: z.object({
+          userId: z.string(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { userId } = request.params;
+
+      // Verificar se o usuário existe e é profissional
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        include: { professionalProfile: true, documents: true },
+      });
+
+      if (!user || user.userType !== "PROFESSIONAL" || !user.professionalProfile) {
+        reply.code(404);
+        return { error: "Professional not found" };
+      }
+
+      // Aprovar todos os documentos pendentes
+      await fastify.prisma.userDocument.updateMany({
+        where: { userId, status: "PENDING" },
+        data: { status: "APPROVED", reviewedAt: new Date() },
+      });
+
+      // Marcar profissional como verificado (visibilidade pública)
+      await fastify.prisma.professionalProfile.update({
+        where: { userId },
+        data: {
+          isVerified: true,
+          onboardingStatus: "VERIFIED",
+        },
+      });
+
+      // users.status permanece ACTIVE (não muda — responsabilidade separada)
+
+      return {
+        message: "Professional approved successfully",
+        userId,
+        isVerified: true,
+        onboardingStatus: "VERIFIED",
+      };
+    }
+  );
+
+  // POST /documents/admin/reject-professional/:userId
+  // Rejeita o profissional com motivo
+  fastify.post<{
+    Params: { userId: string };
+    Body: { reason?: string };
+  }>(
+    "/documents/admin/reject-professional/:userId",
+    {
+      schema: {
+        tags: ["documents", "admin"],
+        description: "Reject a professional with optional reason",
+        params: z.object({
+          userId: z.string(),
+        }),
+        body: z.object({
+          reason: z.string().optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { userId } = request.params;
+      const { reason } = request.body;
+
+      // Verificar se o usuário existe e é profissional
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        include: { professionalProfile: true },
+      });
+
+      if (!user || user.userType !== "PROFESSIONAL" || !user.professionalProfile) {
+        reply.code(404);
+        return { error: "Professional not found" };
+      }
+
+      // Rejeitar todos os documentos pendentes
+      await fastify.prisma.userDocument.updateMany({
+        where: { userId, status: "PENDING" },
+        data: {
+          status: "REJECTED",
+          rejectionReason: reason || "Documentos não aprovados pela equipe",
+          reviewedAt: new Date(),
+        },
+      });
+
+      // Marcar profissional como rejeitado (não aparece na busca pública)
+      await fastify.prisma.professionalProfile.update({
+        where: { userId },
+        data: {
+          isVerified: false,
+          onboardingStatus: "REJECTED",
+        },
+      });
+
+      // users.status permanece ACTIVE (conta ativa, apenas não verificado)
+
+      return {
+        message: "Professional rejected",
+        userId,
+        isVerified: false,
+        onboardingStatus: "REJECTED",
+        reason: reason || "Documentos não aprovados pela equipe",
+      };
+    }
+  );
+
+  // GET /documents/admin/pending-professionals
+  // Lista profissionais com documentos pendentes de revisão
+  fastify.get(
+    "/documents/admin/pending-professionals",
+    {
+      schema: {
+        tags: ["documents", "admin"],
+        description: "List professionals pending verification",
+      },
+    },
+    async () => {
+      const pendingProfessionals = await fastify.prisma.user.findMany({
+        where: {
+          userType: "PROFESSIONAL",
+          professionalProfile: {
+            isVerified: false,
+            onboardingStatus: "SUBMITTED",
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          avatar: true,
+          cpf: true,
+          createdAt: true,
+          documents: {
+            select: {
+              id: true,
+              type: true,
+              url: true,
+              status: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+          },
+          professionalProfile: {
+            select: {
+              onboardingStatus: true,
+              isVerified: true,
+              primaryCategoryId: true,
+              primaryCategory: { select: { name: true } },
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      return {
+        professionals: pendingProfessionals.map((p) => ({
+          ...p,
+          createdAt: p.createdAt.toISOString(),
+          documents: p.documents.map((d) => ({
+            ...d,
+            createdAt: d.createdAt.toISOString(),
+          })),
+        })),
+        total: pendingProfessionals.length,
+      };
+    }
+  );
 };
 
 export default documentRoute;

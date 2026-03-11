@@ -52,11 +52,47 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
         return { error: 'User not found' };
       }
 
+      // Reconciliação automática do status de verificação com base nos documentos
+      let reconciledProfile = user.professionalProfile;
+      if (
+        user.userType === 'PROFESSIONAL' &&
+        reconciledProfile
+      ) {
+        const hasIdDoc = user.documents.some(d => d.type === 'ID_DOCUMENT' && d.status === 'APPROVED');
+        const hasSelfie = user.documents.some(d => d.type === 'SELFIE_WITH_DOCUMENT' && d.status === 'APPROVED');
+        const hasRejectedDoc = user.documents.some(d =>
+          (d.type === 'ID_DOCUMENT' || d.type === 'SELFIE_WITH_DOCUMENT') && d.status === 'REJECTED'
+        );
+
+        if (hasIdDoc && hasSelfie && !reconciledProfile.isVerified) {
+          // Todos aprovados → auto-aprovar perfil
+          reconciledProfile = await fastify.prisma.professionalProfile.update({
+            where: { userId: user.id },
+            data: {
+              isVerified: true,
+              onboardingStatus: 'VERIFIED',
+            },
+          });
+        } else if (hasRejectedDoc && reconciledProfile.onboardingStatus !== 'REJECTED') {
+          // Algum documento rejeitado → marcar perfil como rejeitado
+          reconciledProfile = await fastify.prisma.professionalProfile.update({
+            where: { userId: user.id },
+            data: {
+              isVerified: false,
+              onboardingStatus: 'REJECTED',
+            },
+          });
+        }
+      }
+
       // Remove password from response
       const { passwordHash, refreshTokenHash, resetPasswordToken, resetPasswordExpires, ...userWithoutSensitiveData } = user;
       
       return {
         ...userWithoutSensitiveData,
+        // Campos de verificação achatados para facilitar no frontend
+        isVerified: reconciledProfile?.isVerified ?? false,
+        onboardingStatus: reconciledProfile?.onboardingStatus ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };

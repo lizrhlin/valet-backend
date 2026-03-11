@@ -103,7 +103,8 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
 
       // Construir filtro
       const where: any = {
-        userType: 'PROFESSIONAL', // Filtra apenas profissionais
+        userType: 'PROFESSIONAL',
+        status: 'ACTIVE', // Apenas profissionais com conta ativa (aprovados)
       };
 
       // Obter IDs de profissionais com slots futuros disponíveis
@@ -119,7 +120,10 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
       }
       where.id = { in: Array.from(profsWithFutureSlots) };
 
-      const profileFilter: any = {};
+      const profileFilter: any = {
+        // Apenas profissionais verificados/aprovados aparecem na busca pública
+        isVerified: true,
+      };
 
       // Se available for undefined, não filtrar por disponibilidade
       // (mostra todos, incluindo null que serão tratados como disponíveis)
@@ -293,8 +297,11 @@ const professionalRoute: FastifyPluginAsync = async (fastify) => {
 
       const conditions: string[] = [
         `u."userType" = 'PROFESSIONAL'`,
+        `u."status" = 'ACTIVE'`, // Apenas contas ativas (aprovadas)
         `pp."latitude" IS NOT NULL`,
         `pp."longitude" IS NOT NULL`,
+        // Apenas profissionais verificados/aprovados aparecem na busca pública
+        `pp."is_verified" = true`,
         // earth_distance: calcula distância em metros entre duas coordenadas
         `earth_distance(ll_to_earth(pp."latitude", pp."longitude"), ll_to_earth($1, $2)) <= pp."service_radius_km" * 1000`,
         // Filtro de slots futuros disponíveis (sem appointment ativo bloqueando)

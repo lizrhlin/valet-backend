@@ -23,3 +23,25 @@ Content-Type: application/json
 ###
 
 DELETE http://localhost:3000/usuarios/cf9e2f36-41b0-4599-9462-44afa70f81e4
+
+###
+# ============================================
+# ADMIN — Verificação de Profissionais
+# ============================================
+
+### Listar profissionais pendentes de aprovação
+GET http://localhost:3000/api/documents/admin/pending-professionals
+
+### Aprovar profissional (substituir USER_ID pelo ID real)
+POST http://localhost:3000/api/documents/admin/approve-professional/USER_ID_AQUI
+Content-Type: application/json
+
+{}
+
+### Rejeitar profissional (substituir USER_ID pelo ID real)
+POST http://localhost:3000/api/documents/admin/reject-professional/USER_ID_AQUI
+Content-Type: application/json
+
+{
+  "reason": "Documentos ilegíveis. Por favor, envie novamente."
+}

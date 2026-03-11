@@ -70,8 +70,9 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
         avatar: input.avatar,
         cpf: input.cpf,
         userType: input.userType,
-        // Ativar profissionais que completam o signup com todos os dados
-        status: input.userType === 'PROFESSIONAL' ? 'ACTIVE' : 'PENDING_VERIFICATION',
+        // Conta sempre ACTIVE ao concluir cadastro (cliente e profissional)
+        // Visibilidade pública do profissional é controlada por isVerified/onboardingStatus
+        status: 'ACTIVE',
         // Registrar aceite de termos
         termsAcceptedAt: new Date(),
         termsVersion: '2026-02',
@@ -182,9 +183,15 @@ export async function register(prisma: PrismaClient, input: RegisterInput) {
 }
 
 export async function login(prisma: PrismaClient, input: LoginInput) {
-  // Buscar usuário
+  // Buscar usuário com perfil profissional e documentos (para reconciliação)
   const user = await prisma.user.findUnique({
     where: { email: input.email },
+    include: {
+      professionalProfile: true,
+      documents: {
+        select: { type: true, status: true },
+      },
+    },
   });
 
   if (!user) {
@@ -198,10 +205,48 @@ export async function login(prisma: PrismaClient, input: LoginInput) {
     throw new Error('Credenciais inválidas');
   }
 
+  // Reconciliação automática do status de verificação com base nos documentos
+  let reconciledProfile = user.professionalProfile;
+  if (
+    user.userType === 'PROFESSIONAL' &&
+    reconciledProfile
+  ) {
+    const hasIdDoc = user.documents.some(d => d.type === 'ID_DOCUMENT' && d.status === 'APPROVED');
+    const hasSelfie = user.documents.some(d => d.type === 'SELFIE_WITH_DOCUMENT' && d.status === 'APPROVED');
+    const hasRejectedDoc = user.documents.some(d =>
+      (d.type === 'ID_DOCUMENT' || d.type === 'SELFIE_WITH_DOCUMENT') && d.status === 'REJECTED'
+    );
+
+    if (hasIdDoc && hasSelfie && !reconciledProfile.isVerified) {
+      // Todos aprovados → auto-aprovar perfil
+      reconciledProfile = await prisma.professionalProfile.update({
+        where: { userId: user.id },
+        data: {
+          isVerified: true,
+          onboardingStatus: 'VERIFIED',
+        },
+      });
+    } else if (hasRejectedDoc && reconciledProfile.onboardingStatus !== 'REJECTED') {
+      // Algum documento rejeitado → marcar perfil como rejeitado
+      reconciledProfile = await prisma.professionalProfile.update({
+        where: { userId: user.id },
+        data: {
+          isVerified: false,
+          onboardingStatus: 'REJECTED',
+        },
+      });
+    }
+  }
+
   // Remover senha do retorno
-  const { passwordHash: _pwd, ...userWithoutPassword } = user;
+  const { passwordHash: _pwd, professionalProfile: _pp, documents: _docs, ...userWithoutPassword } = user;
 
   return {
-    user: userWithoutPassword,
+    user: {
+      ...userWithoutPassword,
+      // Campos de verificação do profissional (achatados para facilitar no frontend)
+      isVerified: reconciledProfile?.isVerified ?? false,
+      onboardingStatus: reconciledProfile?.onboardingStatus ?? null,
+    },
   };
 }
