@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import bcrypt from 'bcrypt';
 import { userResponseSchema, updateProfileSchema, updatePreferencesSchema, UpdateProfileInput } from '../schemas/user.schema.js';
 import { authenticate } from '../utils/auth.js';
 
@@ -240,6 +241,118 @@ const usersRoute: FastifyPluginAsync = async (fastify) => {
       });
 
       return user || { notificationsEnabled: true, language: 'pt-BR' };
+    }
+  );
+
+  // Excluir conta do usuário
+  fastify.delete<{
+    Body: { password: string; reason?: string };
+  }>(
+    '/me',
+    {
+      onRequest: [authenticate],
+      schema: {
+        tags: ['users'],
+        description: 'Delete current user account',
+        security: [{ bearerAuth: [] }],
+        body: z.object({
+          password: z.string().min(1, 'Senha é obrigatória'),
+          reason: z.string().optional(),
+        }),
+        response: {
+          200: z.object({ message: z.string() }),
+          400: z.object({ message: z.string() }),
+          409: z.object({ message: z.string() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user.userId;
+      const { password, reason } = request.body;
+
+      try {
+        // 1. Buscar usuário e verificar senha
+        const user = await fastify.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, passwordHash: true, userType: true },
+        });
+
+        if (!user) {
+          reply.code(400);
+          return { message: 'Usuário não encontrado' };
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isPasswordValid) {
+          reply.code(400);
+          return { message: 'Senha incorreta' };
+        }
+
+        // 2. Verificar se há agendamentos ativos
+        const activeAppointments = await fastify.prisma.appointment.findFirst({
+          where: {
+            OR: [
+              { clientId: userId },
+              { professionalId: userId },
+            ],
+            status: { in: ['PENDING', 'CONFIRMED', 'ON_WAY', 'IN_PROGRESS'] },
+          },
+        });
+
+        if (activeAppointments) {
+          reply.code(409);
+          return {
+            message: 'Você possui serviços ativos ou agendamentos em andamento. Finalize ou cancele todos antes de excluir sua conta.',
+          };
+        }
+
+        // 3. Log do motivo (se fornecido)
+        if (reason) {
+          fastify.log.info({ userId, reason }, 'Account deletion reason');
+        }
+
+        // 4. Deletar dados relacionados e conta em transação
+        await fastify.prisma.$transaction(async (tx) => {
+          // Deletar notificações
+          await tx.notification.deleteMany({ where: { userId } });
+
+          // Deletar favoritos (como favoritor e como favoritado)
+          await tx.favorite.deleteMany({ where: { OR: [{ userId }, { professionalId: userId }] } });
+
+          // Deletar reviews (depende de appointments)
+          await tx.review.deleteMany({ where: { OR: [{ fromUserId: userId }, { toUserId: userId }] } });
+
+          // Deletar agendamentos (depende de endereços, subcategorias)
+          await tx.appointment.deleteMany({
+            where: { OR: [{ clientId: userId }, { professionalId: userId }] },
+          });
+
+          // Deletar disponibilidade customizada
+          await tx.customAvailability.deleteMany({ where: { professionalId: userId } });
+
+          // Deletar documentos
+          await tx.userDocument.deleteMany({ where: { userId } });
+
+          // Deletar endereços (após appointments que os referenciam)
+          await tx.address.deleteMany({ where: { userId } });
+
+          // Deletar subcategorias e categorias associadas
+          await tx.professionalSubcategory.deleteMany({ where: { professionalId: userId } });
+          await tx.professionalCategory.deleteMany({ where: { professionalId: userId } });
+
+          // Deletar perfil profissional
+          await tx.professionalProfile.deleteMany({ where: { userId } });
+
+          // Deletar o usuário
+          await tx.user.delete({ where: { id: userId } });
+        });
+
+        return { message: 'Conta excluída com sucesso' };
+      } catch (error) {
+        fastify.log.error(error, 'Error deleting account');
+        reply.code(400);
+        return { message: 'Erro ao excluir conta. Tente novamente.' };
+      }
     }
   );
 };
