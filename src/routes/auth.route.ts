@@ -1,8 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { registerSchema, loginSchema, authResponseSchema, RegisterInput, LoginInput } from '../schemas/user.schema.js';
+import bcrypt from 'bcrypt';
+import { registerSchema, loginSchema, authResponseSchema, RegisterInput, LoginInput, changePasswordSchema, ChangePasswordInput } from '../schemas/user.schema.js';
 import { register, login } from '../services/auth.service.js';
-import { hashRefreshToken, verifyRefreshTokenHash } from '../utils/auth.js';
+import { authenticate, hashRefreshToken, verifyRefreshTokenHash } from '../utils/auth.js';
 
 const authRoute: FastifyPluginAsync = async (fastify) => {
   // Registro
@@ -452,6 +453,66 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
       } catch (error) {
         reply.code(400);
         return { error: error instanceof Error ? error.message : 'Failed to complete registration' };
+      }
+    }
+  );
+
+  // Alterar senha
+  fastify.put<{
+    Body: ChangePasswordInput;
+  }>(
+    '/password/change',
+    {
+      schema: {
+        tags: ['auth'],
+        description: 'Change user password',
+        body: changePasswordSchema,
+        response: {
+          200: z.object({ message: z.string() }),
+          400: z.object({ message: z.string() }),
+          401: z.object({ message: z.string() }),
+        },
+      },
+      onRequest: [authenticate],
+    },
+    async (request, reply) => {
+      const { currentPassword, newPassword } = request.body;
+      const userId = (request.user as any).userId;
+
+      try {
+        const user = await fastify.prisma.user.findUnique({
+          where: { id: userId },
+          select: { passwordHash: true },
+        });
+
+        if (!user) {
+          reply.code(401);
+          return { message: 'Usuário não encontrado' };
+        }
+
+        const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isCurrentPasswordValid) {
+          reply.code(401);
+          return { message: 'Senha atual incorreta' };
+        }
+
+        if (currentPassword === newPassword) {
+          reply.code(400);
+          return { message: 'A nova senha deve ser diferente da atual' };
+        }
+
+        const SALT_ROUNDS = 10;
+        const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+        await fastify.prisma.user.update({
+          where: { id: userId },
+          data: { passwordHash: hashedPassword },
+        });
+
+        return { message: 'Senha alterada com sucesso' };
+      } catch (error) {
+        reply.code(400);
+        return { message: error instanceof Error ? error.message : 'Erro ao alterar senha' };
       }
     }
   );
